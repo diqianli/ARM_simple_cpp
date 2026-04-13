@@ -20,6 +20,35 @@ namespace arm_cpu {
 class Reg;
 class VReg;
 
+// PReg — SVE Predicate Register (P0-P15)
+class PReg {
+public:
+    uint8_t value;
+
+    constexpr PReg() : value(0) {}
+    constexpr explicit PReg(uint8_t v) : value(v) {}
+
+    bool is_valid() const { return value <= 15; }
+
+    std::string_view name() const {
+        static constexpr std::string_view names[16] = {
+            "P0", "P1", "P2", "P3", "P4", "P5", "P6", "P7",
+            "P8", "P9", "P10", "P11", "P12", "P13", "P14", "P15",
+        };
+        return names[value];
+    }
+
+    bool operator==(const PReg& o) const { return value == o.value; }
+    bool operator!=(const PReg& o) const { return value != o.value; }
+    bool operator<(const PReg& o) const { return value < o.value; }
+
+    struct Hash {
+        std::size_t operator()(const PReg& r) const noexcept {
+            return std::hash<uint8_t>{}(r.value);
+        }
+    };
+};
+
 // =====================================================================
 // Reg — ARMv8-A General Purpose Register (X0-X30, SP/XZR=31)
 // =====================================================================
@@ -121,6 +150,30 @@ enum class OpcodeType : uint16_t {
     // Other System
     Eret, Yield, Adr, Pmull,
 
+    // Atomic operations
+    AtomicLoad, AtomicStore, CompareSwap, AtomicAdd, AtomicClr, AtomicSet, AtomicSwp,
+
+    // Conditional select
+    Csel, Cset, Csetm,
+
+    // Prefetch / test-bit branches
+    Prefetch, Tbz, Tbnz,
+
+    // SVE (Scalable Vector Extension)
+    SveAdd, SveSub, SveMul, SveFma,
+    SveCmp, SveFcmp,
+    SveLoad, SveStore,
+    SveLoadContiguous, SveStoreContiguous,
+    SveSel, SveMerge,
+    SveZip, SveUzip, SveTrn,
+    SveCvt, SveFcvt,
+    SvePtrue, SvePfirst, SvePnext,
+
+    // SME (Scalable Matrix Extension)
+    SmeOuterProduct,
+    SmeTileLoad, SmeTileStore,
+    SmeStreamingMode,
+
     // Other
     Other,
 };
@@ -131,6 +184,20 @@ inline bool is_memory_op(OpcodeType op) {
         case OpcodeType::Load: case OpcodeType::Store:
         case OpcodeType::LoadPair: case OpcodeType::StorePair:
         case OpcodeType::Vld: case OpcodeType::Vst:
+        case OpcodeType::SveLoad: case OpcodeType::SveStore:
+        case OpcodeType::SveLoadContiguous: case OpcodeType::SveStoreContiguous:
+        case OpcodeType::SmeTileLoad: case OpcodeType::SmeTileStore:
+            return true;
+        default: return false;
+    }
+}
+
+inline bool is_store_op(OpcodeType op) {
+    switch (op) {
+        case OpcodeType::Store: case OpcodeType::StorePair:
+        case OpcodeType::Vst:
+        case OpcodeType::SveStore: case OpcodeType::SveStoreContiguous:
+        case OpcodeType::SmeTileStore:
             return true;
         default: return false;
     }
@@ -140,6 +207,7 @@ inline bool is_branch(OpcodeType op) {
     switch (op) {
         case OpcodeType::Branch: case OpcodeType::BranchCond:
         case OpcodeType::BranchReg:
+        case OpcodeType::Tbz: case OpcodeType::Tbnz:
             return true;
         default: return false;
     }
@@ -157,6 +225,14 @@ inline bool is_compute(OpcodeType op) {
         case OpcodeType::Fmadd: case OpcodeType::Fmsub: case OpcodeType::Fnmadd: case OpcodeType::Fnmsub:
         case OpcodeType::Aesd: case OpcodeType::Aese: case OpcodeType::Aesimc: case OpcodeType::Aesmc:
         case OpcodeType::Sha1H: case OpcodeType::Sha256H: case OpcodeType::Sha512H:
+        case OpcodeType::Csel: case OpcodeType::Cset: case OpcodeType::Csetm:
+        case OpcodeType::SveAdd: case OpcodeType::SveSub: case OpcodeType::SveMul: case OpcodeType::SveFma:
+        case OpcodeType::SveCmp: case OpcodeType::SveFcmp:
+        case OpcodeType::SveSel: case OpcodeType::SveMerge:
+        case OpcodeType::SveZip: case OpcodeType::SveUzip: case OpcodeType::SveTrn:
+        case OpcodeType::SveCvt: case OpcodeType::SveFcvt:
+        case OpcodeType::SvePtrue: case OpcodeType::SvePfirst: case OpcodeType::SvePnext:
+        case OpcodeType::SmeOuterProduct: case OpcodeType::SmeStreamingMode:
             return true;
         default: return false;
     }
@@ -186,6 +262,38 @@ inline bool is_simd(OpcodeType op) {
         case OpcodeType::Vadd: case OpcodeType::Vsub: case OpcodeType::Vmul:
         case OpcodeType::Vmla: case OpcodeType::Vmls:
         case OpcodeType::Vld: case OpcodeType::Vst: case OpcodeType::Vdup: case OpcodeType::Vmov:
+        case OpcodeType::SveAdd: case OpcodeType::SveSub: case OpcodeType::SveMul: case OpcodeType::SveFma:
+        case OpcodeType::SveCmp: case OpcodeType::SveFcmp:
+        case OpcodeType::SveSel: case OpcodeType::SveMerge:
+        case OpcodeType::SveZip: case OpcodeType::SveUzip: case OpcodeType::SveTrn:
+        case OpcodeType::SveCvt: case OpcodeType::SveFcvt:
+        case OpcodeType::SvePtrue: case OpcodeType::SvePfirst: case OpcodeType::SvePnext:
+        case OpcodeType::SmeOuterProduct:
+            return true;
+        default: return false;
+    }
+}
+
+inline bool is_sve(OpcodeType op) {
+    switch (op) {
+        case OpcodeType::SveAdd: case OpcodeType::SveSub: case OpcodeType::SveMul: case OpcodeType::SveFma:
+        case OpcodeType::SveCmp: case OpcodeType::SveFcmp:
+        case OpcodeType::SveLoad: case OpcodeType::SveStore:
+        case OpcodeType::SveLoadContiguous: case OpcodeType::SveStoreContiguous:
+        case OpcodeType::SveSel: case OpcodeType::SveMerge:
+        case OpcodeType::SveZip: case OpcodeType::SveUzip: case OpcodeType::SveTrn:
+        case OpcodeType::SveCvt: case OpcodeType::SveFcvt:
+        case OpcodeType::SvePtrue: case OpcodeType::SvePfirst: case OpcodeType::SvePnext:
+            return true;
+        default: return false;
+    }
+}
+
+inline bool is_sme(OpcodeType op) {
+    switch (op) {
+        case OpcodeType::SmeOuterProduct:
+        case OpcodeType::SmeTileLoad: case OpcodeType::SmeTileStore:
+        case OpcodeType::SmeStreamingMode:
             return true;
         default: return false;
     }
@@ -266,12 +374,54 @@ inline std::string_view opcode_to_string(OpcodeType op) {
         case OpcodeType::Yield: return "YIELD";
         case OpcodeType::Adr: return "ADR";
         case OpcodeType::Pmull: return "PMULL";
+        // Atomic
+        case OpcodeType::AtomicLoad: return "LDAR";
+        case OpcodeType::AtomicStore: return "STLR";
+        case OpcodeType::CompareSwap: return "CAS";
+        case OpcodeType::AtomicAdd: return "LDADD";
+        case OpcodeType::AtomicClr: return "LDCLR";
+        case OpcodeType::AtomicSet: return "LDSET";
+        case OpcodeType::AtomicSwp: return "SWP";
+        // Conditional select
+        case OpcodeType::Csel: return "CSEL";
+        case OpcodeType::Cset: return "CSET";
+        case OpcodeType::Csetm: return "CSETM";
+        // Prefetch / test-bit
+        case OpcodeType::Prefetch: return "PRFM";
+        case OpcodeType::Tbz: return "TBZ";
+        case OpcodeType::Tbnz: return "TBNZ";
+        // SVE
+        case OpcodeType::SveAdd: return "SVE.ADD";
+        case OpcodeType::SveSub: return "SVE.SUB";
+        case OpcodeType::SveMul: return "SVE.MUL";
+        case OpcodeType::SveFma: return "SVE.FMA";
+        case OpcodeType::SveCmp: return "SVE.CMP";
+        case OpcodeType::SveFcmp: return "SVE.FCMP";
+        case OpcodeType::SveLoad: return "SVE.LD1";
+        case OpcodeType::SveStore: return "SVE.ST1";
+        case OpcodeType::SveLoadContiguous: return "SVE.LD";
+        case OpcodeType::SveStoreContiguous: return "SVE.ST";
+        case OpcodeType::SveSel: return "SVE.SEL";
+        case OpcodeType::SveMerge: return "SVE.MERGE";
+        case OpcodeType::SveZip: return "SVE.ZIP";
+        case OpcodeType::SveUzip: return "SVE.UZP";
+        case OpcodeType::SveTrn: return "SVE.TRN";
+        case OpcodeType::SveCvt: return "SVE.CVT";
+        case OpcodeType::SveFcvt: return "SVE.FCVT";
+        case OpcodeType::SvePtrue: return "SVE.PTRUE";
+        case OpcodeType::SvePfirst: return "SVE.PFIRST";
+        case OpcodeType::SvePnext: return "SVE.PNEXT";
+        // SME
+        case OpcodeType::SmeOuterProduct: return "SME.FMOPA";
+        case OpcodeType::SmeTileLoad: return "SME.LD1";
+        case OpcodeType::SmeTileStore: return "SME.ST1";
+        case OpcodeType::SmeStreamingMode: return "SME.SM";
         case OpcodeType::Other: return "OTHER";
     }
     return "?";
 }
 
-/// Execution latency in cycles (simplified model)
+/// Execution latency in cycles (simplified model, inspired by Neoverse V2/N2)
 inline uint64_t latency(OpcodeType op) {
     switch (op) {
         case OpcodeType::Mul: case OpcodeType::Div: return 3;
@@ -291,6 +441,38 @@ inline uint64_t latency(OpcodeType op) {
         case OpcodeType::Vdup: case OpcodeType::Vmov: return 1;
         case OpcodeType::Fmadd: case OpcodeType::Fmsub:
         case OpcodeType::Fnmadd: case OpcodeType::Fnmsub: return 4;
+        // Atomic operations
+        case OpcodeType::CompareSwap: return 12;
+        case OpcodeType::AtomicLoad: return 4;
+        case OpcodeType::AtomicStore: return 1;
+        case OpcodeType::AtomicAdd: case OpcodeType::AtomicClr:
+        case OpcodeType::AtomicSet: case OpcodeType::AtomicSwp: return 6;
+        // Conditional select
+        case OpcodeType::Csel: case OpcodeType::Cset: case OpcodeType::Csetm: return 1;
+        // SVE integer arithmetic
+        case OpcodeType::SveAdd: case OpcodeType::SveSub: return 2;
+        case OpcodeType::SveMul: return 4;
+        // SVE FP arithmetic
+        case OpcodeType::SveFma: return 5;
+        // SVE compare
+        case OpcodeType::SveCmp: case OpcodeType::SveFcmp: return 2;
+        // SVE load/store (base + vector-length scaling)
+        case OpcodeType::SveLoad: return 4;
+        case OpcodeType::SveLoadContiguous: return 5;
+        case OpcodeType::SveStore: return 1;
+        case OpcodeType::SveStoreContiguous: return 1;
+        // SVE permute
+        case OpcodeType::SveSel: case OpcodeType::SveMerge: return 2;
+        case OpcodeType::SveZip: case OpcodeType::SveUzip: case OpcodeType::SveTrn: return 2;
+        // SVE convert
+        case OpcodeType::SveCvt: case OpcodeType::SveFcvt: return 3;
+        // SVE predicate
+        case OpcodeType::SvePtrue: case OpcodeType::SvePfirst: case OpcodeType::SvePnext: return 1;
+        // SME outer product (matrix multiply — high latency)
+        case OpcodeType::SmeOuterProduct: return 16;
+        case OpcodeType::SmeTileLoad: return 8;
+        case OpcodeType::SmeTileStore: return 1;
+        case OpcodeType::SmeStreamingMode: return 1;
         default: return 1;
     }
 }
@@ -388,6 +570,9 @@ struct Instruction {
     StaticVector<Reg, 2> dst_regs;
     StaticVector<VReg, 4> src_vregs;
     StaticVector<VReg, 2> dst_vregs;
+    StaticVector<PReg, 2> src_pregs;
+    StaticVector<PReg, 1> dst_pregs;
+    uint8_t sve_element_size = 0;  // SVE element size: 1=B, 2=H, 4=S, 8=D, 16=Q
     std::optional<MemAccess> mem_access;
     std::optional<BranchInfo> branch_info;
     std::optional<std::string> disasm;
@@ -418,6 +603,16 @@ struct Instruction {
         return *this;
     }
 
+    Instruction& with_src_preg(PReg reg) {
+        if (!src_pregs.contains(reg)) src_pregs.push_back(reg);
+        return *this;
+    }
+
+    Instruction& with_dst_preg(PReg reg) {
+        if (!dst_pregs.contains(reg)) dst_pregs.push_back(reg);
+        return *this;
+    }
+
     Instruction& with_mem_access(uint64_t addr, uint8_t size, bool is_load) {
         mem_access = MemAccess{addr, size, is_load};
         return *this;
@@ -435,6 +630,10 @@ struct Instruction {
 
     bool reads_reg(Reg reg) const { return src_regs.contains(reg); }
     bool writes_reg(Reg reg) const { return dst_regs.contains(reg); }
+    bool reads_vreg(VReg reg) const { return src_vregs.contains(reg); }
+    bool writes_vreg(VReg reg) const { return dst_vregs.contains(reg); }
+    bool reads_preg(PReg reg) const { return src_pregs.contains(reg); }
+    bool writes_preg(PReg reg) const { return dst_pregs.contains(reg); }
 
     uint64_t instr_latency() const { return latency(opcode_type); }
 };
@@ -511,6 +710,13 @@ struct std::hash<arm_cpu::Reg> {
 template<>
 struct std::hash<arm_cpu::VReg> {
     std::size_t operator()(const arm_cpu::VReg& r) const noexcept {
+        return std::hash<uint8_t>{}(r.value);
+    }
+};
+
+template<>
+struct std::hash<arm_cpu::PReg> {
+    std::size_t operator()(const arm_cpu::PReg& r) const noexcept {
         return std::hash<uint8_t>{}(r.value);
     }
 };

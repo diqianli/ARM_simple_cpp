@@ -15,15 +15,25 @@ ExecutionUnit execution_unit_for(const Instruction& instr) {
         case OpcodeType::Msr: case OpcodeType::Mrs: case OpcodeType::Sys:
         case OpcodeType::Dmb: case OpcodeType::Dsb: case OpcodeType::Isb:
         case OpcodeType::Eret: case OpcodeType::Yield: case OpcodeType::Adr:
+        case OpcodeType::Csel: case OpcodeType::Cset: case OpcodeType::Csetm:
+        case OpcodeType::Prefetch: case OpcodeType::Tbz: case OpcodeType::Tbnz:
             return ExecutionUnit::IntAlu;
 
         case OpcodeType::Mul: case OpcodeType::Div:
             return ExecutionUnit::IntMul;
 
         case OpcodeType::Load: case OpcodeType::LoadPair: case OpcodeType::Vld:
+        case OpcodeType::AtomicLoad:
+        case OpcodeType::SveLoad: case OpcodeType::SveLoadContiguous:
+        case OpcodeType::SmeTileLoad:
             return ExecutionUnit::Load;
 
         case OpcodeType::Store: case OpcodeType::StorePair: case OpcodeType::Vst:
+        case OpcodeType::AtomicStore: case OpcodeType::CompareSwap:
+        case OpcodeType::AtomicAdd: case OpcodeType::AtomicClr:
+        case OpcodeType::AtomicSet: case OpcodeType::AtomicSwp:
+        case OpcodeType::SveStore: case OpcodeType::SveStoreContiguous:
+        case OpcodeType::SmeTileStore:
             return ExecutionUnit::Store;
 
         case OpcodeType::Branch: case OpcodeType::BranchCond: case OpcodeType::BranchReg:
@@ -34,6 +44,14 @@ ExecutionUnit execution_unit_for(const Instruction& instr) {
         case OpcodeType::Vmla: case OpcodeType::Vmls: case OpcodeType::Vdup: case OpcodeType::Vmov:
         case OpcodeType::Fmadd: case OpcodeType::Fmsub: case OpcodeType::Fnmadd: case OpcodeType::Fnmsub:
         case OpcodeType::Fcvt:
+        // SVE arithmetic / permute / predicate → FpSimd
+        case OpcodeType::SveAdd: case OpcodeType::SveSub: case OpcodeType::SveMul: case OpcodeType::SveFma:
+        case OpcodeType::SveCmp: case OpcodeType::SveFcmp:
+        case OpcodeType::SveSel: case OpcodeType::SveMerge:
+        case OpcodeType::SveZip: case OpcodeType::SveUzip: case OpcodeType::SveTrn:
+        case OpcodeType::SveCvt: case OpcodeType::SveFcvt:
+        case OpcodeType::SvePtrue: case OpcodeType::SvePfirst: case OpcodeType::SvePnext:
+        case OpcodeType::SmeStreamingMode:
             return ExecutionUnit::FpSimd;
 
         case OpcodeType::DcZva: case OpcodeType::DcCivac: case OpcodeType::DcCvac:
@@ -44,6 +62,10 @@ ExecutionUnit execution_unit_for(const Instruction& instr) {
         case OpcodeType::Aesd: case OpcodeType::Aese: case OpcodeType::Aesimc: case OpcodeType::Aesmc:
         case OpcodeType::Sha1H: case OpcodeType::Sha256H: case OpcodeType::Sha512H:
         case OpcodeType::Pmull:
+            return ExecutionUnit::Crypto;
+
+        // SME outer product → dedicated matrix unit (mapped to Crypto for now)
+        case OpcodeType::SmeOuterProduct:
             return ExecutionUnit::Crypto;
     }
     return ExecutionUnit::IntAlu;

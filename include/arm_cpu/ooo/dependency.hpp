@@ -20,6 +20,8 @@ struct DependencyInfo {
 
 struct DependencyStats {
     std::size_t register_producers = 0;
+    std::size_t vreg_producers = 0;
+    std::size_t preg_producers = 0;
     std::size_t pending_instructions = 0;
     std::size_t total_dependents = 0;
 };
@@ -57,6 +59,8 @@ private:
     void add_memory_dependency(InstructionId producer, InstructionId consumer);
 
     std::unordered_map<Reg, InstructionId, Reg::Hash> register_producers_;
+    std::unordered_map<VReg, InstructionId, VReg::Hash> vreg_producers_;
+    std::unordered_map<PReg, InstructionId, PReg::Hash> preg_producers_;
     std::unordered_map<InstructionId, std::size_t, InstructionId::Hash> pending_dependencies_;
     std::unordered_map<InstructionId, std::vector<InstructionId>, InstructionId::Hash> dependents_;
     std::unordered_map<uint64_t, InstructionId> memory_producers_;

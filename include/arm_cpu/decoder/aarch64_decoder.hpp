@@ -39,6 +39,8 @@ struct DecodedInstruction {
     std::vector<Reg>          dst_regs;
     std::vector<VReg>         src_vregs;
     std::vector<VReg>         dst_vregs;
+    std::vector<PReg>         src_pregs;
+    std::vector<PReg>         dst_pregs;
     std::optional<int64_t>    immediate;
     std::optional<MemAccess>  mem_access;
     std::optional<BranchInfo> branch_info;
@@ -58,6 +60,8 @@ struct DecodedInstruction {
         for (auto r : dst_regs)  instr.with_dst_reg(r);
         for (auto r : src_vregs) instr.with_src_vreg(r);
         for (auto r : dst_vregs) instr.with_dst_vreg(r);
+        for (auto r : src_pregs) instr.with_src_preg(r);
+        for (auto r : dst_pregs) instr.with_dst_preg(r);
         if (mem_access) {
             instr.with_mem_access(mem_access->addr, mem_access->size, mem_access->is_load);
         }

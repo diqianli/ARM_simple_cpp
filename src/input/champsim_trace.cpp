@@ -138,7 +138,10 @@ Instruction ChampSimTraceParser::convert_instruction(const ChampSimInstr& cs_ins
         } else if (src_count == 2 && dst_count == 1) {
             opcode_type = OpcodeType::Add;
         } else if (src_count == 3 && dst_count == 1) {
-            opcode_type = OpcodeType::Mul;
+            // 3 src, 1 dst — likely multiply or conditional select (CSEL)
+            // CSEL uses: cond + 2 src regs + 1 dst = 3 src (flags + 2 regs)
+            // MUL uses: 2 src + 1 dst, but ChampSim may count flags as src
+            opcode_type = OpcodeType::Csel;
         } else if (src_count == 4 && dst_count == 1) {
             opcode_type = OpcodeType::Mul;
         } else if (src_count == 0 && dst_count == 1) {
@@ -284,7 +287,7 @@ Result<std::optional<ChampSimInstr>> ChampSimXzTraceParser::read_instruction() {
 // =====================================================================
 
 Instruction ChampSimXzTraceParser::convert_instruction(const ChampSimInstr& cs_instr) {
-    // Determine opcode type (same simplified logic as the XZ variant in Rust)
+    // Determine opcode type based on instruction characteristics
     OpcodeType opcode_type;
     if (cs_instr.is_branch) {
         opcode_type = OpcodeType::Branch;
@@ -295,7 +298,33 @@ Instruction ChampSimXzTraceParser::convert_instruction(const ChampSimInstr& cs_i
             opcode_type = OpcodeType::Load;
         }
     } else {
-        opcode_type = OpcodeType::Other;
+        // Infer from register patterns (same as uncompressed variant)
+        std::size_t src_count = 0;
+        for (auto r : cs_instr.source_registers) if (r != 0) ++src_count;
+        std::size_t dst_count = 0;
+        for (auto r : cs_instr.destination_registers) if (r != 0) ++dst_count;
+
+        if (src_count >= 1 && dst_count == 0) {
+            opcode_type = OpcodeType::Cmp;
+        } else if (src_count == 1 && dst_count == 1) {
+            opcode_type = OpcodeType::Mov;
+        } else if (src_count == 2 && dst_count == 1) {
+            opcode_type = OpcodeType::Add;
+        } else if (src_count == 3 && dst_count == 1) {
+            opcode_type = OpcodeType::Csel;
+        } else if (src_count == 4 && dst_count == 1) {
+            opcode_type = OpcodeType::Mul;
+        } else if (src_count == 0 && dst_count == 1) {
+            opcode_type = OpcodeType::Mov;
+        } else if (src_count == 0 && dst_count == 0) {
+            opcode_type = OpcodeType::Nop;
+        } else if (dst_count == 1) {
+            opcode_type = OpcodeType::Add;
+        } else if (dst_count == 2) {
+            opcode_type = OpcodeType::LoadPair;
+        } else {
+            opcode_type = OpcodeType::Nop;
+        }
     }
 
     Instruction instr(InstructionId(current_id_), cs_instr.ip, 0, opcode_type);

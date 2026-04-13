@@ -13,8 +13,10 @@ endif()
 # Compiler options
 if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
     add_compile_options(-Wall -Wextra -Wpedantic)
+    # Scope -march=native to C++ only (Capstone C code uses its own arch flags)
     if(CMAKE_BUILD_TYPE STREQUAL "Release")
-        add_compile_options(-O3 -march=native)
+        add_compile_options($<$<COMPILE_LANGUAGE:CXX>:-O3>)
+        add_compile_options($<$<COMPILE_LANGUAGE:CXX>:-march=native>)
     endif()
 endif()
 
@@ -58,6 +60,20 @@ if(NOT ankerl_unordered_dense_FOUND)
     add_library(ankerl::unordered_dense ALIAS unordered_dense)
 endif()
 
+# Capstone disassembly engine (ARMv8 + SVE/SME support)
+option(USE_CAPSTONE "Enable Capstone disassembly backend" ON)
+if(USE_CAPSTONE)
+    FetchContent_Declare(
+        capstone
+        GIT_REPOSITORY https://github.com/capstone-engine/capstone.git
+        GIT_TAG        v5
+        CMAKE_ARGS     -DCAPSTONE_AARCH64_SUPPORT=ON
+                       -DCAPSTONE_BUILD_TESTS=OFF
+                       -DCAPSTONE_BUILD_CSTOOL=OFF
+    )
+    FetchContent_MakeAvailable(capstone)
+endif()
+
 # --- Library ---
 file(GLOB_RECURSE ARM_CPU_SOURCES
     src/*.cpp
@@ -77,6 +93,11 @@ target_link_libraries(arm_cpu_emulator PUBLIC
     nlohmann_json::nlohmann_json
     spdlog::spdlog
 )
+
+if(USE_CAPSTONE)
+    target_link_libraries(arm_cpu_emulator PUBLIC capstone)
+    target_compile_definitions(arm_cpu_emulator PUBLIC HAS_CAPSTONE=1)
+endif()
 
 # Check for liblzma (ChampSim XZ support)
 find_package(LibLZMA QUIET)

@@ -26,6 +26,32 @@ std::vector<DependencyInfo> DependencyTracker::register_instruction(
         }
     }
 
+    // Vector register dependencies (VReg RAW)
+    for (const auto& src_vreg : instr.src_vregs) {
+        auto it = vreg_producers_.find(src_vreg);
+        if (it != vreg_producers_.end()) {
+            auto producer_id = it->second;
+            if (producer_id != id && completed_instructions_.find(producer_id) == completed_instructions_.end()) {
+                add_dependency(producer_id, id);
+                deps_count++;
+                dependencies.push_back({producer_id, false});
+            }
+        }
+    }
+
+    // Predicate register dependencies (PReg RAW)
+    for (const auto& src_preg : instr.src_pregs) {
+        auto it = preg_producers_.find(src_preg);
+        if (it != preg_producers_.end()) {
+            auto producer_id = it->second;
+            if (producer_id != id && completed_instructions_.find(producer_id) == completed_instructions_.end()) {
+                add_dependency(producer_id, id);
+                deps_count++;
+                dependencies.push_back({producer_id, false});
+            }
+        }
+    }
+
     // Memory dependencies
     if (instr.mem_access.has_value()) {
         uint64_t addr = instr.mem_access->addr;
@@ -43,6 +69,16 @@ std::vector<DependencyInfo> DependencyTracker::register_instruction(
     // Update register producers
     for (const auto& dst_reg : instr.dst_regs) {
         register_producers_[dst_reg] = id;
+    }
+
+    // Update vector register producers
+    for (const auto& dst_vreg : instr.dst_vregs) {
+        vreg_producers_[dst_vreg] = id;
+    }
+
+    // Update predicate register producers
+    for (const auto& dst_preg : instr.dst_pregs) {
+        preg_producers_[dst_preg] = id;
     }
 
     // Update memory producer for stores
@@ -96,6 +132,8 @@ std::size_t DependencyTracker::pending_count(InstructionId id) const {
 
 void DependencyTracker::clear() {
     register_producers_.clear();
+    vreg_producers_.clear();
+    preg_producers_.clear();
     pending_dependencies_.clear();
     dependents_.clear();
     memory_producers_.clear();
@@ -106,6 +144,8 @@ void DependencyTracker::clear() {
 DependencyStats DependencyTracker::get_stats() const {
     DependencyStats stats;
     stats.register_producers = register_producers_.size();
+    stats.vreg_producers = vreg_producers_.size();
+    stats.preg_producers = preg_producers_.size();
     stats.pending_instructions = pending_dependencies_.size();
     for (const auto& [_, deps] : dependents_) {
         stats.total_dependents += deps.size();
