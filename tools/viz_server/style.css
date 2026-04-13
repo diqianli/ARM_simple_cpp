@@ -1,0 +1,754 @@
+/* ARM CPU Emulator Visualization Styles */
+
+:root {
+    --bg-primary: #1a1a2e;
+    --bg-secondary: #16213e;
+    --bg-tertiary: #0f3460;
+    --text-primary: #eaeaea;
+    --text-secondary: #a0a0a0;
+    --accent-primary: #e94560;
+    --accent-secondary: #0f4c75;
+    --status-waiting: #6c757d;
+    --status-ready: #0d6efd;
+    --status-executing: #ffc107;
+    --status-completed: #198754;
+    --status-committed: #13aa52;
+    --border-color: #2a2a4a;
+}
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background-color: var(--bg-primary);
+    color: var(--text-primary);
+    min-height: 100vh;
+}
+
+.container {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+/* Header */
+header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    padding-bottom: 15px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+h1 {
+    font-size: 1.5rem;
+    color: var(--accent-primary);
+}
+
+.controls {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+
+.btn {
+    padding: 8px 16px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 1rem;
+    transition: all 0.2s ease;
+}
+
+.btn-primary {
+    background-color: var(--accent-primary);
+    color: white;
+}
+
+.btn-primary:hover {
+    background-color: #d63d56;
+}
+
+.btn-secondary {
+    background-color: var(--bg-tertiary);
+    color: var(--text-primary);
+}
+
+.btn-secondary:hover {
+    background-color: #1a4a7a;
+}
+
+.btn-warning {
+    background-color: #fd7e14;
+    color: white;
+}
+
+.btn-warning:hover {
+    background-color: #e67300;
+}
+
+.speed-control {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-left: 20px;
+}
+
+.speed-control label {
+    color: var(--text-secondary);
+}
+
+#speedSlider {
+    width: 100px;
+}
+
+#speedValue {
+    min-width: 30px;
+    text-align: center;
+}
+
+/* Metrics Bar */
+.metrics-bar {
+    display: flex;
+    gap: 30px;
+    padding: 15px;
+    background-color: var(--bg-secondary);
+    border-radius: 8px;
+    margin-bottom: 20px;
+}
+
+.metric {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.metric-label {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+}
+
+.metric-value {
+    font-size: 1.25rem;
+    font-weight: bold;
+    color: var(--accent-primary);
+}
+
+/* Main Content */
+.main-content {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+/* Pipeline Section */
+.pipeline-section {
+    background-color: var(--bg-secondary);
+    padding: 20px;
+    border-radius: 8px;
+}
+
+.pipeline-section h2 {
+    margin-bottom: 15px;
+    font-size: 1.1rem;
+}
+
+.pipeline {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+}
+
+.pipeline-stage {
+    background-color: var(--bg-tertiary);
+    padding: 15px 25px;
+    border-radius: 8px;
+    text-align: center;
+    min-width: 100px;
+}
+
+.stage-name {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    margin-bottom: 5px;
+}
+
+.stage-count {
+    font-size: 1.5rem;
+    font-weight: bold;
+    color: var(--accent-primary);
+}
+
+.pipeline-arrow {
+    font-size: 1.5rem;
+    color: var(--text-secondary);
+}
+
+/* Instruction Window Section */
+.instruction-window-section {
+    background-color: var(--bg-secondary);
+    padding: 20px;
+    border-radius: 8px;
+    max-height: 400px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+.instruction-window-section h2 {
+    margin-bottom: 15px;
+    font-size: 1.1rem;
+}
+
+.window-container {
+    overflow-y: auto;
+    flex: 1;
+}
+
+.instruction-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.85rem;
+}
+
+.instruction-table th,
+.instruction-table td {
+    padding: 8px 12px;
+    text-align: left;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.instruction-table th {
+    background-color: var(--bg-tertiary);
+    position: sticky;
+    top: 0;
+    z-index: 1;
+}
+
+.instruction-table tbody tr:hover {
+    background-color: var(--bg-tertiary);
+}
+
+/* Status Colors */
+.status-waiting {
+    color: var(--status-waiting);
+}
+
+.status-ready {
+    color: var(--status-ready);
+}
+
+.status-executing {
+    color: var(--status-executing);
+}
+
+.status-completed {
+    color: var(--status-completed);
+}
+
+.status-committed {
+    color: var(--status-committed);
+}
+
+.status-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+}
+
+.status-badge.waiting {
+    background-color: var(--status-waiting);
+    color: white;
+}
+
+.status-badge.ready {
+    background-color: var(--status-ready);
+    color: white;
+}
+
+.status-badge.executing {
+    background-color: var(--status-executing);
+    color: black;
+}
+
+.status-badge.completed {
+    background-color: var(--status-completed);
+    color: white;
+}
+
+.status-badge.committed {
+    background-color: var(--status-committed);
+    color: white;
+}
+
+/* Bottom Section */
+.bottom-section {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+}
+
+/* Dependency Graph Section */
+.dependency-section {
+    background-color: var(--bg-secondary);
+    padding: 20px;
+    border-radius: 8px;
+}
+
+.dependency-section h2 {
+    margin-bottom: 15px;
+    font-size: 1.1rem;
+}
+
+.graph-container {
+    background-color: var(--bg-tertiary);
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+#dependencyGraph {
+    display: block;
+}
+
+/* Charts Section */
+.charts-section {
+    background-color: var(--bg-secondary);
+    padding: 20px;
+    border-radius: 8px;
+}
+
+.charts-section h2 {
+    margin-bottom: 15px;
+    font-size: 1.1rem;
+}
+
+.charts-section h3 {
+    font-size: 0.95rem;
+    margin-bottom: 10px;
+    color: var(--text-secondary);
+}
+
+.chart-container {
+    margin-bottom: 20px;
+}
+
+#ipcChart {
+    background-color: var(--bg-tertiary);
+    border-radius: 8px;
+    width: 100%;
+}
+
+.cache-stats {
+    margin-top: 20px;
+}
+
+.cache-bar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 10px;
+}
+
+.cache-label {
+    width: 80px;
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+}
+
+.bar-container {
+    flex: 1;
+    height: 20px;
+    background-color: var(--bg-tertiary);
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.bar {
+    height: 100%;
+    transition: width 0.3s ease;
+}
+
+.bar-hit {
+    background-color: var(--status-completed);
+}
+
+.bar-l2 {
+    background-color: var(--status-ready);
+}
+
+.bar-miss {
+    background-color: var(--accent-primary);
+}
+
+.bar-value {
+    width: 50px;
+    text-align: right;
+    font-size: 0.85rem;
+}
+
+/* Status Bar */
+.status-bar {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    padding: 10px 20px;
+    background-color: var(--bg-secondary);
+    border-top: 1px solid var(--border-color);
+    text-align: center;
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+}
+
+.status-bar.connected {
+    color: var(--status-completed);
+}
+
+.status-bar.error {
+    color: var(--accent-primary);
+}
+
+/* Scrollbar Styling */
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: var(--bg-tertiary);
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+    background: var(--accent-secondary);
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: var(--accent-primary);
+}
+
+/* Responsive Design */
+@media (max-width: 1024px) {
+    .bottom-section {
+        grid-template-columns: 1fr;
+    }
+
+    .metrics-bar {
+        flex-wrap: wrap;
+        gap: 15px;
+    }
+}
+
+@media (max-width: 768px) {
+    header {
+        flex-direction: column;
+        gap: 15px;
+    }
+
+    .controls {
+        flex-wrap: wrap;
+        justify-content: center;
+    }
+
+    .pipeline {
+        flex-wrap: wrap;
+    }
+
+    .metrics-bar {
+        justify-content: center;
+    }
+}
+
+/* Animation */
+@keyframes pulse {
+    0% { opacity: 1; }
+    50% { opacity: 0.5; }
+    100% { opacity: 1; }
+}
+
+.executing {
+    animation: pulse 0.5s ease-in-out infinite;
+}
+
+/* Node and edge styles for dependency graph */
+.node {
+    cursor: pointer;
+}
+
+.node circle {
+    fill: var(--bg-tertiary);
+    stroke: var(--accent-secondary);
+    stroke-width: 2px;
+}
+
+.node text {
+    fill: var(--text-primary);
+    font-size: 12px;
+}
+
+.node.waiting circle {
+    stroke: var(--status-waiting);
+}
+
+.node.ready circle {
+    stroke: var(--status-ready);
+}
+
+.node.executing circle {
+    stroke: var(--status-executing);
+}
+
+.node.completed circle {
+    stroke: var(--status-completed);
+}
+
+.link {
+    fill: none;
+    stroke: var(--text-secondary);
+    stroke-width: 1.5px;
+    stroke-opacity: 0.6;
+}
+
+.link.register {
+    stroke: var(--status-ready);
+}
+
+.link.memory {
+    stroke: var(--accent-primary);
+    stroke-dasharray: 5, 5;
+}
+
+/* Tab Navigation */
+.tab-navigation {
+    display: flex;
+    gap: 5px;
+    margin-bottom: 15px;
+    padding: 0 5px;
+}
+
+.tab-btn {
+    padding: 10px 20px;
+    background-color: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px 8px 0 0;
+    color: var(--text-secondary);
+    cursor: pointer;
+    font-size: 0.9rem;
+    transition: all 0.2s ease;
+}
+
+.tab-btn:hover {
+    background-color: var(--bg-tertiary);
+    color: var(--text-primary);
+}
+
+.tab-btn.active {
+    background-color: var(--bg-tertiary);
+    color: var(--accent-primary);
+    border-bottom-color: var(--bg-tertiary);
+}
+
+.tab-content {
+    display: none;
+}
+
+.tab-content.active {
+    display: block;
+}
+
+/* Konata Pipeline View Section */
+.konata-section {
+    background-color: var(--bg-secondary);
+    padding: 20px;
+    border-radius: 8px;
+}
+
+.konata-section h2 {
+    margin-bottom: 15px;
+    font-size: 1.1rem;
+}
+
+.pipeline-view-container {
+    background-color: var(--bg-primary);
+    border-radius: 8px;
+    height: 400px;
+    overflow: hidden;
+}
+
+/* Pipeline View Component */
+.pipeline-view {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+
+.pipeline-view .pipeline-controls {
+    display: flex;
+    gap: 10px;
+    padding: 10px;
+    background-color: var(--bg-secondary);
+    border-bottom: 1px solid var(--border-color);
+    flex-wrap: wrap;
+    align-items: center;
+}
+
+.pipeline-view .control-group {
+    display: flex;
+    gap: 5px;
+    align-items: center;
+}
+
+.pipeline-view .btn-sm {
+    padding: 5px 10px;
+    font-size: 0.85rem;
+    background-color: var(--bg-tertiary);
+    color: var(--text-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.pipeline-view .btn-sm:hover {
+    background-color: var(--accent-secondary);
+}
+
+.pipeline-view .search-input {
+    padding: 5px 10px;
+    font-size: 0.85rem;
+    background-color: var(--bg-tertiary);
+    color: var(--text-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    width: 150px;
+}
+
+.pipeline-view .search-input:focus {
+    outline: none;
+    border-color: var(--accent-primary);
+}
+
+.pipeline-view .search-count {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    min-width: 60px;
+}
+
+.pipeline-view .canvas-container {
+    flex: 1;
+    overflow: hidden;
+    background-color: var(--bg-primary);
+}
+
+.pipeline-view .info-panel {
+    padding: 8px 10px;
+    background-color: var(--bg-secondary);
+    border-top: 1px solid var(--border-color);
+    font-size: 0.85rem;
+}
+
+.pipeline-view .info-row {
+    display: flex;
+    gap: 10px;
+}
+
+.pipeline-view .info-label {
+    color: var(--text-secondary);
+}
+
+.pipeline-view .info-value {
+    color: var(--text-primary);
+    font-family: monospace;
+}
+
+.pipeline-view .error-message {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    color: var(--accent-primary);
+    font-size: 1rem;
+}
+
+/* Responsive for Pipeline View */
+@media (max-width: 768px) {
+    .pipeline-view .pipeline-controls {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .pipeline-view .control-group {
+        justify-content: center;
+    }
+
+    .pipeline-view .search-input {
+        width: 100%;
+    }
+
+    .pipeline-view-container {
+        height: 300px;
+    }
+}
+
+/* File Controls */
+.file-controls {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+
+/* Status Bar */
+.status-bar {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    padding: 10px 20px;
+    background-color: var(--bg-secondary);
+    border-top: 1px solid var(--border-color);
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    z-index: 1000;
+}
+
+/* Large Pipeline Container for Static View */
+.pipeline-view-container {
+    background-color: var(--bg-primary);
+    border-radius: 8px;
+    height: 600px;
+    overflow: hidden;
+}
+
+/* Loading Spinner */
+.loading {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 200px;
+    color: var(--text-secondary);
+}
+
+.loading::after {
+    content: '';
+    width: 40px;
+    height: 40px;
+    border: 3px solid var(--border-color);
+    border-top-color: var(--accent-primary);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin-left: 10px;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}

@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ARM CPU Emulator - Konata Visualization</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>ARM CPU Emulator - Pipeline Visualization</h1>
+            <div class="file-controls">
+                <label for="fileInput" class="btn btn-primary">Load JSON File</label>
+                <input type="file" id="fileInput" accept=".json" style="display: none;">
+                <button id="reloadBtn" class="btn btn-secondary">Reload Data</button>
+            </div>
+        </header>
+
+        <div class="metrics-bar">
+            <div class="metric">
+                <span class="metric-label">Total Cycles:</span>
+                <span id="totalCycles" class="metric-value">-</span>
+            </div>
+            <div class="metric">
+                <span class="metric-label">Instructions:</span>
+                <span id="totalInstructions" class="metric-value">-</span>
+            </div>
+            <div class="metric">
+                <span class="metric-label">Operations:</span>
+                <span id="opsCount" class="metric-value">-</span>
+            </div>
+        </div>
+
+        <!-- Drag-and-drop zone -->
+        <div id="dropZone" class="drop-zone" style="display: none;">
+            <div class="drop-icon">&#128194;</div>
+            <div class="drop-text">Drop a Konata JSON file here</div>
+            <div class="drop-hint">or click "Load JSON File" above</div>
+        </div>
+
+        <!-- Main Konata Pipeline View -->
+        <section class="konata-section">
+            <h2>Konata Pipeline Visualization</h2>
+            <div id="pipelineViewContainer" class="pipeline-view-container"></div>
+        </section>
+    </div>
+
+    <div id="statusBar" class="status-bar">
+        Ready. Loading visualization data...
+    </div>
+
+    <!-- Load Konata dependencies (relative paths for standalone use) -->
+    <script src="konata/op.js"></script>
+    <script src="konata/stage.js"></script>
+    <script src="konata/konata_renderer.js"></script>
+    <script src="pipeline_view.js"></script>
+    <script src="app_static.js"></script>
+</body>
+</html>
