@@ -5,6 +5,7 @@
 #include "arm_cpu/input/text_trace.hpp"
 #include "arm_cpu/input/binary_trace.hpp"
 #include "arm_cpu/input/champsim_trace.hpp"
+#include "arm_cpu/input/elf_trace.hpp"
 
 namespace arm_cpu {
 
@@ -19,6 +20,15 @@ std::unique_ptr<InstructionSource> create_source(const TraceInputConfig& config)
         case TraceFormat::Json:
         case TraceFormat::ChampSimXz:
             // Not yet implemented; fall through to text as default
+            return std::make_unique<TextTraceParser>(TextTraceParser::from_file(config.file_path).value());
+        case TraceFormat::Elf: {
+            auto result = ElfTraceParser::from_file(config.file_path);
+            if (result.has_error()) {
+                std::fprintf(stderr, "Error loading ELF: %s\n", result.error().message().c_str());
+                return nullptr;
+            }
+            return std::make_unique<ElfTraceParser>(std::move(result.value()));
+        }
             return std::make_unique<TextTraceParser>(TextTraceParser::from_file(config.file_path).value());
     }
     return std::make_unique<TextTraceParser>(TextTraceParser::from_file(config.file_path).value());

@@ -6,11 +6,17 @@
 /// Provides snapshot metrics structures and summary/reporting utilities.
 /// Ported from Rust src/stats/metrics.rs.
 
+#include "arm_cpu/types.hpp"
+
 #include <cstdint>
 #include <cstddef>
 #include <string>
+#include <unordered_map>
+#include <vector>
 
 namespace arm_cpu {
+
+// OpcodeTypeHash is defined in arm_cpu/types.hpp
 
 // =====================================================================
 // PerformanceMetrics — overall performance snapshot
@@ -28,6 +34,9 @@ struct PerformanceMetrics {
     double branch_instr_pct = 0.0;
     double avg_load_latency = 0.0;
     double avg_store_latency = 0.0;
+
+    /// Per-opcode-type instruction counts (e.g., {Add: 1200, Load: 800, ...})
+    std::unordered_map<OpcodeType, uint64_t, OpcodeTypeHash> instr_by_type;
 
     /// Calculate execution time in nanoseconds given frequency in MHz
     uint64_t execution_time_ns(uint64_t frequency_mhz) const;

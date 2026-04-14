@@ -476,6 +476,7 @@ PerformanceMetrics StatsCollector::get_metrics() const {
     m.branch_instr_pct = stats_.branch_instr_percentage();
     m.avg_load_latency = stats_.memory_stats.avg_load_latency;
     m.avg_store_latency = stats_.memory_stats.avg_store_latency;
+    m.instr_by_type = stats_.instr_by_type;
     return m;
 }
 

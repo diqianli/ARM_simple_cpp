@@ -19,10 +19,19 @@
 #include <string_view>
 #include <unordered_map>
 
-// Forward declarations for Capstone types (defined in capstone/capstone.h)
 struct cs_insn;
 
 namespace arm_cpu::decoder {
+
+/// Pre-computed mnemonic→OpcodeType lookup table.
+struct MnemonicLookup {
+    std::unordered_map<std::string_view, OpcodeType> table;
+
+    MnemonicLookup();
+
+    /// Look up mnemonic, return OpcodeType::Other if not found.
+    OpcodeType lookup(std::string_view mnemonic) const;
+};
 
 /// Capstone-based AArch64 decoder.
 ///
@@ -61,6 +70,8 @@ public:
 
 private:
     size_t handle_ = 0;  // csh handle (size_t in Capstone v5)
+
+    static const MnemonicLookup lookup_;
 
     /// Map a Capstone mnemonic string to an OpcodeType.
     [[nodiscard]] OpcodeType map_mnemonic(std::string_view mnemonic) const;

@@ -164,10 +164,9 @@ Result<PerformanceMetrics> CPUEmulator::run_with_limit(
         auto completions_processed = ooo_engine_->cycle_tick();
 
         if (completions_processed > 0) {
-            // Process newly ready instructions
+            // Record ready cycle for newly ready instructions (issue is recorded in execute())
             auto newly_ready = ooo_engine_->take_newly_ready();
             for (auto ready_id : newly_ready) {
-                pipeline_tracker_->record_issue(ready_id, current_cycle_);
                 visualization_->pipeline_tracker().record_ready(ready_id, current_cycle_);
             }
         }
@@ -241,10 +240,9 @@ void CPUEmulator::step() {
     // Process completions for this cycle FIRST (releases dependencies)
     ooo_engine_->cycle_tick();
 
-    // Record ready cycle for newly ready instructions
+    // Record ready cycle for newly ready instructions (issue is recorded in execute())
     auto newly_ready = ooo_engine_->take_newly_ready();
     for (auto ready_id : newly_ready) {
-        pipeline_tracker_->record_issue(ready_id, current_cycle_);
         visualization_->pipeline_tracker().record_ready(ready_id, current_cycle_);
     }
 
@@ -341,8 +339,8 @@ Result<void> CPUEmulator::execute() {
             if (instr.mem_access.has_value()) {
                 TRY(handle_memory_op(id, instr.mem_access.value()));
             } else {
-                // Memory op without address - complete immediately
-                uint64_t complete_cycle = current_cycle_ + 1;
+                // Memory op without address - complete after L1 latency
+                uint64_t complete_cycle = current_cycle_ + config_.l1_hit_latency;
                 ooo_engine_->mark_completed(id, complete_cycle);
 
                 pipeline_tracker_->record_memory(id, current_cycle_, complete_cycle);
@@ -377,7 +375,7 @@ Result<void> CPUEmulator::handle_memory_op(InstructionId id, const MemAccess& ac
     }
 
     // Memory requests now always complete (no pending state)
-    uint64_t complete_cycle = request.complete_cycle.value_or(current_cycle_ + 1);
+    uint64_t complete_cycle = request.complete_cycle.value_or(current_cycle_ + config_.l1_hit_latency);
     ooo_engine_->mark_completed(id, complete_cycle);
 
     // Track memory stage for visualization
@@ -399,7 +397,19 @@ Result<void> CPUEmulator::handle_memory_op(InstructionId id, const MemAccess& ac
     if (access.is_load) {
         uint64_t lat = complete_cycle - current_cycle_;
         stats_.record_load(access.size, lat);
-        stats_.record_l1_access(true); // Simplified
+        // Record cache access at correct level
+        if (request.cache_info.has_value()) {
+            auto level = request.cache_info->servicing_level;
+            if (level == CacheLevel::L1) {
+                stats_.record_l1_access(true);
+            } else {
+                stats_.record_l1_access(false);
+                if (level == CacheLevel::L2) stats_.record_l2_access(true);
+                else stats_.record_l2_access(false);
+            }
+        } else {
+            stats_.record_l1_access(true); // fallback: no cache info
+        }
     } else {
         stats_.record_store(access.size, 1);
     }

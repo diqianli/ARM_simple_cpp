@@ -7,9 +7,7 @@
 
 #include "arm_cpu/decoder/capstone_decoder.hpp"
 
-#include <spdlog/spdlog.h>
-
-#include <algorithm>
+#include <cstdio>
 #include <cstring>
 #include <string_view>
 
@@ -530,16 +528,24 @@ static constexpr MnemonicMapping kArm64Mappings[] = {
     {"sme_addva",OpcodeType::SmeOuterProduct},
 };
 
-static constexpr std::size_t kMappingCount = sizeof(kArm64Mappings) / sizeof(kArm64Mappings[0]);
+// =====================================================================
+// MnemonicLookup implementation
+// =====================================================================
 
-/// Case-insensitive mnemonic comparison for lookup.
-static int mnemonic_compare(const void* a, const void* b) {
-    auto* ma = static_cast<const MnemonicMapping*>(a);
-    auto* mb = static_cast<const MnemonicMapping*>(b);
-    // Use the first entry's mnemonic as search key (just compare by a's mnemonic vs b's)
-    // bsearch key only has mnemonic field set
-    return std::strcmp(ma->mnemonic, mb->mnemonic);
+MnemonicLookup::MnemonicLookup() {
+    for (const auto& m : kArm64Mappings) {
+        table.emplace(m.mnemonic, m.opcode);
+    }
 }
+
+OpcodeType MnemonicLookup::lookup(std::string_view mnemonic) const {
+    auto it = table.find(mnemonic);
+    if (it != table.end()) return it->second;
+    return OpcodeType::Other;
+}
+
+// Static instance
+const MnemonicLookup CapstoneDecoder::lookup_{};
 
 // =====================================================================
 // CapstoneDecoder implementation
@@ -572,35 +578,28 @@ CapstoneDecoder& CapstoneDecoder::operator=(CapstoneDecoder&& other) noexcept {
 bool CapstoneDecoder::init() {
     if (handle_) return true;
 
-    cs_mode mode = static_cast<cs_mode>(CS_MODE_ARM | CS_MODE_V8);
+    cs_mode mode = CS_MODE_LITTLE_ENDIAN;
     if (cs_open(CS_ARCH_ARM64, mode, &handle_) != CS_ERR_OK) {
         handle_ = 0;
-        spdlog::error("Capstone: failed to initialize AArch64 disassembler");
+        std::fprintf(stderr, "Capstone: failed to initialize AArch64 disassembler\n");
         return false;
     }
 
     // Enable detailed mode for operand extraction
     cs_option(handle_, CS_OPT_DETAIL, CS_OPT_ON);
 
-    spdlog::info("Capstone: initialized AArch64 disassembler (SVE/SME enabled)");
+    std::fprintf(stderr, "Capstone: initialized AArch64 disassembler (SVE/SME enabled)\n");
     return true;
 }
 
 OpcodeType CapstoneDecoder::map_mnemonic(std::string_view mnemonic) const {
-    // Try binary search in the mapping table
-    MnemonicMapping key{mnemonic.data(), OpcodeType::Other};
-    auto* result = static_cast<const MnemonicMapping*>(
-        std::bsearch(&key, kArm64Mappings, kMappingCount, sizeof(MnemonicMapping), mnemonic_compare));
-
-    if (result) return result->opcode;
+    auto result = lookup_.lookup(mnemonic);
+    if (result != OpcodeType::Other) return result;
 
     // Fallback: pattern-based classification for mnemonics not in the table
-    // SVE instructions start with "sve_" or have SVE register operands
     if (mnemonic.starts_with("sve_")) return OpcodeType::SveAdd;
     if (mnemonic.starts_with("sme_")) return OpcodeType::SmeOuterProduct;
 
-    // NEON vector instructions often have 3-char lowercase mnemonics
-    // that aren't in the table — classify by disasm inspection later
     return OpcodeType::Other;
 }
 
@@ -617,6 +616,22 @@ void CapstoneDecoder::extract_operands(const cs_insn* insn, DecodedInstruction& 
     auto* detail = insn->detail;
     auto* arch = &detail->arm64;
 
+    // Helper: map Capstone ARM64 register ID to our Reg number (0-31).
+    // Capstone v5 uses non-contiguous IDs: X0=218..X28=246, FP/X29=2, LR/X30=3,
+    // W0=187..W28=215, WZR=8, SP=34, WSP=7, XZR=1.
+    auto to_gpr = [](unsigned int reg_id) -> std::optional<uint8_t> {
+        if (reg_id >= ARM64_REG_X0 && reg_id <= ARM64_REG_X28)
+            return static_cast<uint8_t>(reg_id - ARM64_REG_X0);
+        if (reg_id == ARM64_REG_FP || reg_id == ARM64_REG_X29) return 29;
+        if (reg_id == ARM64_REG_LR || reg_id == ARM64_REG_X30) return 30;
+        if (reg_id >= ARM64_REG_W0 && reg_id <= ARM64_REG_W28)
+            return static_cast<uint8_t>(reg_id - ARM64_REG_W0);
+        if (reg_id == ARM64_REG_XZR || reg_id == ARM64_REG_WZR ||
+            reg_id == ARM64_REG_SP  || reg_id == ARM64_REG_WSP)
+            return 31;
+        return std::nullopt;
+    };
+
     // Extract operand count and iterate
     int op_count = detail->arm64.op_count;
     for (int i = 0; i < op_count && i < 8; ++i) {
@@ -625,38 +640,39 @@ void CapstoneDecoder::extract_operands(const cs_insn* insn, DecodedInstruction& 
         switch (op.type) {
             case ARM64_OP_REG: {
                 auto reg_id = op.reg;
-                // Map Capstone register IDs to our register types
-                if (reg_id >= ARM64_REG_X0 && reg_id <= ARM64_REG_X30) {
-                    Reg r(static_cast<uint8_t>(reg_id - ARM64_REG_X0));
-                    // First reg is usually destination
-                    if (i == 0 && out.dst_regs.empty()) {
+                bool is_write = (op.access & CS_AC_WRITE) != 0;
+                bool is_read  = (op.access & CS_AC_READ) != 0;
+
+                // GPR (X/W registers)
+                if (auto gpr = to_gpr(reg_id); gpr.has_value()) {
+                    Reg r(*gpr);
+                    if (is_write) {
                         out.dst_regs.push_back(r);
+                        if (is_read) out.src_regs.push_back(r);
                     } else {
                         out.src_regs.push_back(r);
                     }
-                } else if (reg_id == ARM64_REG_XZR || reg_id == ARM64_REG_SP) {
-                    Reg r(31);
-                    out.src_regs.push_back(r);
                 } else if (reg_id >= ARM64_REG_V0 && reg_id <= ARM64_REG_V31) {
                     VReg r(static_cast<uint8_t>(reg_id - ARM64_REG_V0));
-                    if (i == 0 && out.dst_vregs.empty()) {
+                    if (is_write) {
                         out.dst_vregs.push_back(r);
+                        if (is_read) out.src_vregs.push_back(r);
                     } else {
                         out.src_vregs.push_back(r);
                     }
                 } else if (reg_id >= ARM64_REG_Z0 && reg_id <= ARM64_REG_Z31) {
-                    // SVE Z registers — stored as VReg (shared namespace)
                     VReg r(static_cast<uint8_t>(reg_id - ARM64_REG_Z0));
-                    if (i == 0 && out.dst_vregs.empty()) {
+                    if (is_write) {
                         out.dst_vregs.push_back(r);
+                        if (is_read) out.src_vregs.push_back(r);
                     } else {
                         out.src_vregs.push_back(r);
                     }
                 } else if (reg_id >= ARM64_REG_P0 && reg_id <= ARM64_REG_P15) {
-                    // SVE P (predicate) registers
                     PReg p(static_cast<uint8_t>(reg_id - ARM64_REG_P0));
-                    if (i == 0 && out.dst_pregs.empty()) {
+                    if (is_write) {
                         out.dst_pregs.push_back(p);
+                        if (is_read) out.src_pregs.push_back(p);
                     } else {
                         out.src_pregs.push_back(p);
                     }
@@ -699,7 +715,7 @@ DecodedInstruction CapstoneDecoder::decode(uint64_t pc, uint32_t raw) const {
     DecodedInstruction result(pc, raw);
 
     if (!handle_) {
-        spdlog::warn("CapstoneDecoder::decode called without initialization");
+        std::fprintf(stderr, "CapstoneDecoder::decode called without initialization\n");
         return result;
     }
 

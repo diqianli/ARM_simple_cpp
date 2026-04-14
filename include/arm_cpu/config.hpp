@@ -135,6 +135,7 @@ enum class TraceFormat : uint8_t {
     Json,
     ChampSim,
     ChampSimXz,
+    Elf,
 };
 
 /// Trace input configuration

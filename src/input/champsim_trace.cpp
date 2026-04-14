@@ -196,6 +196,43 @@ Instruction ChampSimTraceParser::convert_instruction(const ChampSimInstr& cs_ins
         instr.branch_info = BranchInfo{true, 0, cs_instr.branch_taken};
     }
 
+    // Generate disasm string from opcode + registers + memory
+    {
+        std::string d;
+        d += opcode_to_string(opcode_type);
+
+        if (instr.mem_access.has_value()) {
+            // Memory instruction: OP Xd, [addr] or OP Xs, [addr] (store)
+            d += " ";
+            // For stores, the value register is in src_regs[0]; for loads, dst_regs[0]
+            if (!instr.mem_access->is_load && !instr.src_regs.empty()) {
+                d += "X" + std::to_string(instr.src_regs[0].value);
+            } else if (!instr.dst_regs.empty()) {
+                d += "X" + std::to_string(instr.dst_regs[0].value);
+            }
+            char buf[20];
+            std::snprintf(buf, sizeof(buf), "%llx",
+                static_cast<unsigned long long>(instr.mem_access->addr));
+            d += ", [0x" + std::string(buf) + "]";
+        } else if (!instr.dst_regs.empty() || !instr.src_regs.empty()) {
+            // Non-memory instruction: OP Xd, Xs1, Xs2, ...
+            d += " ";
+            bool first = true;
+            for (auto& r : instr.dst_regs) {
+                if (!first) d += ", ";
+                d += "X" + std::to_string(r.value);
+                first = false;
+            }
+            for (auto& r : instr.src_regs) {
+                if (!first) d += ", ";
+                d += "X" + std::to_string(r.value);
+                first = false;
+            }
+        }
+
+        instr.disasm = std::move(d);
+    }
+
     return instr;
 }
 
@@ -352,6 +389,40 @@ Instruction ChampSimXzTraceParser::convert_instruction(const ChampSimInstr& cs_i
 
     if (cs_instr.is_branch) {
         instr.branch_info = BranchInfo{true, 0, cs_instr.branch_taken};
+    }
+
+    // Generate disasm string from opcode + registers + memory
+    {
+        std::string d;
+        d += opcode_to_string(opcode_type);
+
+        if (instr.mem_access.has_value()) {
+            d += " ";
+            if (!instr.mem_access->is_load && !instr.src_regs.empty()) {
+                d += "X" + std::to_string(instr.src_regs[0].value);
+            } else if (!instr.dst_regs.empty()) {
+                d += "X" + std::to_string(instr.dst_regs[0].value);
+            }
+            char buf[20];
+            std::snprintf(buf, sizeof(buf), "%llx",
+                static_cast<unsigned long long>(instr.mem_access->addr));
+            d += ", [0x" + std::string(buf) + "]";
+        } else if (!instr.dst_regs.empty() || !instr.src_regs.empty()) {
+            d += " ";
+            bool first = true;
+            for (auto& r : instr.dst_regs) {
+                if (!first) d += ", ";
+                d += "X" + std::to_string(r.value);
+                first = false;
+            }
+            for (auto& r : instr.src_regs) {
+                if (!first) d += ", ";
+                d += "X" + std::to_string(r.value);
+                first = false;
+            }
+        }
+
+        instr.disasm = std::move(d);
     }
 
     return instr;

@@ -330,6 +330,10 @@
   <label style="margin-left:auto">
     <input type="checkbox" id="showCacheSubs" checked> Show cache sub-stages
   </label>
+  <label>
+    Max ops:
+    <input type="number" id="maxOpsInput" value="500" min="50" max="50000" step="50" style="width:70px">
+  </label>
 </div>
 
 <div class="ruler" id="ruler"></div>
@@ -349,9 +353,9 @@ let pxPerCycle = 20;
 
 function loadDemoData() {
   // Try loading from the generated JSON file
-  fetch('viz_demo_data.json')
+  fetch('viz_demo_data.json?_t=' + Date.now(), { cache: 'no-store' })
     .then(r => { if (!r.ok) throw new Error(); return r.json(); })
-    .then(d => { data = d; render(); })
+    .then(d => { truncateAndRender(d); })
     .catch(() => {
       // Fallback: generate inline demo data
       data = generateInlineDemo();
@@ -362,16 +366,81 @@ function loadDemoData() {
 function loadFile(event) {
   const file = event.target.files[0];
   if (!file) return;
+
+  // For small files (< 5MB), use standard JSON.parse
+  if (file.size < 5 * 1024 * 1024) {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const raw = JSON.parse(e.target.result);
+        truncateAndRender(raw);
+      } catch (err) {
+        alert('Invalid JSON: ' + err.message);
+      }
+    };
+    reader.readAsText(file);
+    return;
+  }
+
+  // For large files, extract first N ops without full JSON.parse
+  const maxOps = parseInt(document.getElementById('maxOpsInput').value) || 500;
+  const slice = file.slice(0, 10 * 1024 * 1024); // read first 10MB
   const reader = new FileReader();
   reader.onload = (e) => {
     try {
-      data = JSON.parse(e.target.result);
+      const text = e.target.result;
+      // Find "ops": [ and extract objects up to maxOps
+      const opsStart = text.indexOf('"ops"');
+      if (opsStart === -1) { alert('Cannot find ops array'); return; }
+      const arrStart = text.indexOf('[', opsStart);
+      if (arrStart === -1) { alert('Cannot find ops array start'); return; }
+
+      // Find the metadata before ops
+      let metadata = {};
+      try {
+        // Try parsing the prefix before ops as a partial object
+        const prefix = text.substring(0, opsStart).replace(/,\s*$/, '');
+        const wrapped = prefix + ',"ops":[]}';
+        const partial = JSON.parse(wrapped);
+        metadata = partial;
+        delete partial.ops;
+      } catch (_) {}
+
+      // Count braces to extract N ops
+      let depth = 0, count = 0, i = arrStart + 1;
+      const opsText = ['['];
+      for (; i < text.length && count < maxOps; i++) {
+        const ch = text[i];
+        opsText.push(ch);
+        if (ch === '{') depth++;
+        else if (ch === '}') {
+          depth--;
+          if (depth === 0) {
+            count++;
+            if (count < maxOps) opsText.push(',');
+          }
+        }
+      }
+      opsText.push(']');
+
+      const fullJSON = '{"ops":' + opsText.join('') + ',"ops_count":' + count + ',"total_cycles":' + (metadata.total_cycles || 0) + ',"total_instructions":' + (metadata.total_instructions || 0) + ',"version":"1.0"}';
+      data = JSON.parse(fullJSON);
       render();
     } catch (err) {
-      alert('Invalid JSON: ' + err.message);
+      alert('Failed to parse large file: ' + err.message);
     }
   };
-  reader.readAsText(file);
+  reader.readAsText(slice);
+}
+
+function truncateAndRender(raw) {
+  const maxOps = parseInt(document.getElementById('maxOpsInput').value) || 500;
+  if (raw.ops && raw.ops.length > maxOps) {
+    raw.ops = raw.ops.slice(0, maxOps);
+    raw.ops_count = raw.ops.length;
+  }
+  data = raw;
+  render();
 }
 
 function generateInlineDemo() {
@@ -418,11 +487,13 @@ function render() {
     pxPerCycle = parseInt(scaleVal);
   }
 
-  // Stats
+  // Stats (support both demo format and Konata export format)
+  const totalCycles = data.total_cycles || data.cycle || 0;
+  const committed = data.total_instructions || data.committed_count || ops.length;
   document.getElementById('stat-ops').textContent = ops.length;
-  document.getElementById('stat-cycle').textContent = data.cycle;
-  document.getElementById('stat-committed').textContent = data.committed_count;
-  document.getElementById('stat-ipc').textContent = (data.committed_count / Math.max(1, data.cycle)).toFixed(3);
+  document.getElementById('stat-cycle').textContent = totalCycles;
+  document.getElementById('stat-committed').textContent = committed;
+  document.getElementById('stat-ipc').textContent = (committed / Math.max(1, totalCycles)).toFixed(3);
 
   const showCache = document.getElementById('showCacheSubs').checked;
   const timelineWidth = (maxCycle + 2) * pxPerCycle;

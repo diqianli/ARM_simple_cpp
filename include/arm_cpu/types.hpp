@@ -554,6 +554,13 @@ struct InstructionId {
     };
 };
 
+/// Hash functor for OpcodeType (needed for unordered_map)
+struct OpcodeTypeHash {
+    std::size_t operator()(OpcodeType op) const noexcept {
+        return std::hash<uint16_t>{}(static_cast<uint16_t>(op));
+    }
+};
+
 } // namespace arm_cpu
 
 namespace arm_cpu {

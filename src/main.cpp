@@ -14,6 +14,7 @@
 #include "arm_cpu/memory/memory_subsystem.hpp"
 
 #include <cmath>
+#include <ctime>
 #include <cstdio>
 #include <filesystem>
 #include <fstream>
@@ -45,6 +46,7 @@ struct CliArgs {
     std::size_t num_threads = 0;
     bool save_trace = false;
     std::string trace_output_file;
+    std::string output_file;                   // Konata JSON output path
     bool verbose = false;
     bool json_output = false;
 
@@ -89,6 +91,7 @@ void print_usage(const char* program_name) {
         "  -t, --threads <n>        Number of threads (default: hardware concurrency)\n"
         "\n"
         "Output:\n"
+        "  -o, --output <file>      Save Konata visualization JSON to file (default: output/<stem>_YYYYMMDD_HHMM.json)\n"
         "  --save-trace <file>      Save execution trace to file\n"
         "\n"
         "General:\n"
@@ -188,6 +191,10 @@ bool parse_args(int argc, char* argv[], CliArgs& args) {
             args.save_trace = true;
             args.trace_output_file = argv[++i];
         }
+        else if (arg == "-o" || arg == "--output") {
+            if (i + 1 >= argc) { std::fprintf(stderr, "Error: missing argument for %s\n", arg.data()); return false; }
+            args.output_file = argv[++i];
+        }
         else if (arg[0] == '-') {
             std::fprintf(stderr, "Error: unknown option: %s\n", arg.data());
             return false;
@@ -211,6 +218,7 @@ arm_cpu::TraceFormat parse_trace_format(std::string_view fmt) {
     if (fmt == "json") return arm_cpu::TraceFormat::Json;
     if (fmt == "champsim") return arm_cpu::TraceFormat::ChampSim;
     if (fmt == "champsim_xz" || fmt == "champsimxz") return arm_cpu::TraceFormat::ChampSimXz;
+    if (fmt == "elf") return arm_cpu::TraceFormat::Elf;
     std::fprintf(stderr, "Warning: unknown trace format '%.*s', defaulting to text\n",
                  static_cast<int>(fmt.size()), fmt.data());
     return arm_cpu::TraceFormat::Text;
@@ -250,8 +258,7 @@ void print_json_metrics(const arm_cpu::PerformanceMetrics& m) {
         "  \"memory_instr_pct\": %.6f,\n"
         "  \"branch_instr_pct\": %.6f,\n"
         "  \"avg_load_latency\": %.6f,\n"
-        "  \"avg_store_latency\": %.6f\n"
-        "}\n",
+        "  \"avg_store_latency\": %.6f,\n",
         static_cast<unsigned long long>(m.total_instructions),
         static_cast<unsigned long long>(m.total_cycles),
         m.ipc,
@@ -265,9 +272,30 @@ void print_json_metrics(const arm_cpu::PerformanceMetrics& m) {
         m.avg_load_latency,
         m.avg_store_latency
     );
+
+    // Instruction breakdown by opcode type
+    std::printf("  \"instructions\": {\n");
+    bool first = true;
+    for (const auto& [opcode, count] : m.instr_by_type) {
+        if (count == 0) continue;
+        if (!first) std::printf(",\n");
+        first = false;
+        double pct = (m.total_instructions > 0)
+            ? static_cast<double>(count) / static_cast<double>(m.total_instructions) * 100.0
+            : 0.0;
+        std::printf("    \"%.*s\": { \"count\": %llu, \"pct\": %.2f }",
+                     static_cast<int>(arm_cpu::opcode_to_string(opcode).size()),
+                     arm_cpu::opcode_to_string(opcode).data(),
+                     static_cast<unsigned long long>(count),
+                     pct);
+    }
+    if (!first) std::printf("\n");
+    std::printf("  }\n");
+
+    std::printf("}\n");
 }
 
-int run_single(const CliArgs& args) {
+int run_single(const CliArgs& args, int argc, char* argv[]) {
     using namespace arm_cpu;
 
     auto config = build_config(args);
@@ -345,6 +373,12 @@ int run_single(const CliArgs& args) {
                              args.trace_output_file.c_str());
             }
         }
+
+        // SimulationEngine has no Konata export
+        std::fprintf(stderr, "\n========================================\n");
+        std::fprintf(stderr, "  Input:  %s\n", args.trace_file.c_str());
+        std::fprintf(stderr, "  Output: (SimulationEngine has no Konata export)\n");
+        std::fprintf(stderr, "========================================\n\n");
     } else {
         // Use CPUEmulator path
         std::unique_ptr<CPUEmulator> cpu;
@@ -421,6 +455,45 @@ int run_single(const CliArgs& args) {
                              args.trace_output_file.c_str());
             }
         }
+
+        // Export Konata JSON — fixed output directory with timestamped filename
+        std::string output_path;
+        if (args.output_file.empty()) {
+            // Fixed output directory: <project_root>/output/
+            auto output_dir = std::filesystem::current_path() / "output";
+            if (!std::filesystem::exists(std::filesystem::current_path() / "output")) {
+                output_dir = std::filesystem::current_path() / ".." / "output";
+            }
+            if (!std::filesystem::exists(output_dir)) {
+                output_dir = std::filesystem::path(argv[0]).parent_path() / ".." / "output";
+            }
+            std::filesystem::create_directories(output_dir);
+
+            // Derive base name from input file (stem)
+            auto stem = std::filesystem::path(args.trace_file).stem().string();
+
+            // Timestamp: YYYYMMDD_HHMM
+            std::time_t now = std::time(nullptr);
+            std::tm local_tm;
+            localtime_r(&now, &local_tm);
+            char ts[20];
+            std::strftime(ts, sizeof(ts), "%Y%m%d_%H%M", &local_tm);
+
+            output_path = (output_dir / (stem + "_" + ts + ".json")).string();
+        } else {
+            output_path = args.output_file;
+        }
+
+        bool exported = cpu->visualization_mut().export_all_konata_to_file(output_path, true);
+
+        std::fprintf(stderr, "\n========================================\n");
+        std::fprintf(stderr, "  Input:  %s\n", args.trace_file.c_str());
+        if (exported) {
+            std::fprintf(stderr, "  Output: %s\n", output_path.c_str());
+        } else {
+            std::fprintf(stderr, "  Output: (no visualization data to export)\n");
+        }
+        std::fprintf(stderr, "========================================\n\n");
     }
 
     return 0;
@@ -517,6 +590,6 @@ int main(int argc, char* argv[]) {
     if (args.multi_instance) {
         return run_multi_instance(args);
     } else {
-        return run_single(args);
+        return run_single(args, argc, argv);
     }
 }

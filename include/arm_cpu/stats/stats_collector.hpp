@@ -22,12 +22,7 @@
 
 namespace arm_cpu {
 
-/// Hash functor for OpcodeType (needed for unordered_map)
-struct OpcodeTypeHash {
-    std::size_t operator()(OpcodeType op) const noexcept {
-        return std::hash<uint16_t>{}(static_cast<uint16_t>(op));
-    }
-};
+// OpcodeTypeHash is defined in arm_cpu/types.hpp
 
 // =====================================================================
 // StatsCacheInfo — internal cache statistics (for tracking during simulation)
