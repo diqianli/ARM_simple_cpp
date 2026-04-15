@@ -1,0 +1,24 @@
+# Basic text trace — covers ALU, Load/Store, Branch, NOP, FP
+# Format 2: disassembly style (PC: mnemonic operands)
+# ~20 instructions for quick pipeline verification
+
+0x400000: ADD X0, X1, X2
+0x400004: SUB X3, X4, X5
+0x400008: MUL X6, X7, X8
+0x40000c: AND X9, X10, X11
+0x400010: ORR X12, X13, X14
+0x400014: EOR X15, X16, X17
+0x400018: LSL X19, X20, #3
+0x40001c: LDR X21, [X22, #16]
+0x400020: STR X23, [X24, #32]
+0x400024: LDR X25, [X26, #64]
+0x400028: B 0x400040
+0x40002c: NOP
+0x400030: FADD V0, V1, V2
+0x400034: FSUB V3, V4, V5
+0x400038: FMUL V6, V7, V8
+0x40003c: FDIV V9, V10, V11
+0x400040: ADD X0, X3, X5
+0x400044: SUB X1, X4, X6
+0x400048: STR X7, [X8, #8]
+0x40004c: NOP
