@@ -44,8 +44,12 @@ Result<ElfTraceParser> ElfTraceParser::from_file(const std::string& path) {
 
         for (std::size_t offset = 0; offset + 4 <= seg->size; offset += 4) {
             uint64_t pc = seg->vaddr + offset;
-            uint32_t raw = 0;
-            std::memcpy(&raw, seg->data.data() + offset, 4);
+            // Byte-by-byte read to avoid alignment/aliasing issues
+            const uint8_t* p = seg->data.data() + offset;
+            uint32_t raw = static_cast<uint32_t>(p[0])
+                         | (static_cast<uint32_t>(p[1]) << 8)
+                         | (static_cast<uint32_t>(p[2]) << 16)
+                         | (static_cast<uint32_t>(p[3]) << 24);
 
             auto decoded = capstone.decode(pc, raw);
             auto instr = decoded.to_instruction(InstructionId(instructions.size()));

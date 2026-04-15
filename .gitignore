@@ -1,5 +1,6 @@
 # Build
 build/
+build-debug/
 
 # IDE
 .vscode/
@@ -23,6 +24,14 @@ CMakeCache.txt
 CMakeFiles/
 cmake_install.cmake
 Makefile
+
+# Output
+output/
+
+# Screenshots & images
+*.png
+*.jpg
+*.jpeg
 
 # Temporary
 *.tmp

@@ -35,6 +35,7 @@ public:
             "P0", "P1", "P2", "P3", "P4", "P5", "P6", "P7",
             "P8", "P9", "P10", "P11", "P12", "P13", "P14", "P15",
         };
+        if (value > 15) return "P?";
         return names[value];
     }
 
@@ -72,6 +73,7 @@ public:
             "X24", "X25", "X26", "X27", "X28", "X29", "X30",
         };
         if (value == 31) return "SP/XZR";
+        if (value > 30) return "X?";
         return names[value];
     }
 

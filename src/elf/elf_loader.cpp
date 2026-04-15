@@ -830,9 +830,10 @@ Result<SymbolTable> ElfLoader::parse_symbols(
 
         // Get symbol name
         std::size_t name_start = strtab_offset + static_cast<std::size_t>(st_name);
-        if (name_start >= data.size()) continue;
+        std::size_t strtab_end = strtab_offset + strtab_size;
+        if (name_start >= data.size() || name_start >= strtab_end) continue;
 
-        auto remaining = data.subspan(name_start, strtab_offset + strtab_size - name_start);
+        auto remaining = data.subspan(name_start, strtab_end - name_start);
         auto null_pos = static_cast<std::size_t>(
             std::distance(remaining.begin(), std::find(remaining.begin(), remaining.end(), 0)));
         if (null_pos == 0) null_pos = remaining.size();
@@ -888,12 +889,17 @@ std::optional<std::string_view> ElfLoader::get_function_at(uint64_t addr) const 
 
 std::optional<std::vector<uint8_t>> ElfLoader::read_memory(uint64_t addr, std::size_t size) const {
     for (const auto& seg : segments_) {
-        if (addr >= seg.vaddr && addr + size <= seg.vaddr + seg.size) {
-            std::size_t offset = static_cast<std::size_t>(addr - seg.vaddr);
-            return std::vector<uint8_t>(
-                seg.data.begin() + static_cast<std::ptrdiff_t>(offset),
-                seg.data.begin() + static_cast<std::ptrdiff_t>(offset + size));
-        }
+        // Check for integer overflow before comparison
+        if (addr < seg.vaddr) continue;
+        uint64_t seg_end = seg.vaddr + seg.size;
+        if (seg_end < seg.vaddr) continue; // overflow
+        if (size > seg_end - addr) continue;
+        if (addr + size > seg_end) continue;
+
+        std::size_t offset = static_cast<std::size_t>(addr - seg.vaddr);
+        return std::vector<uint8_t>(
+            seg.data.begin() + static_cast<std::ptrdiff_t>(offset),
+            seg.data.begin() + static_cast<std::ptrdiff_t>(offset + size));
     }
     return {};
 }
