@@ -245,26 +245,27 @@ void TraceOutput::record_commit(InstructionId id, uint64_t cycle) {
 
 void TraceOutput::add_entry(TraceEntry entry) {
     if (max_entries_ > 0 && entries_.size() >= max_entries_) {
+        // Remove oldest entry from index
+        index_.erase(entries_.front().id);
         entries_.pop_front();
     }
-    entries_.push_back(std::move(entry));
+    auto it = entries_.insert(entries_.end(), std::move(entry));
+    index_[it->id] = it;
 }
 
 TraceEntry* TraceOutput::find_entry_mut(InstructionId id) {
-    // Search from back (most recent first)
-    for (auto it = entries_.rbegin(); it != entries_.rend(); ++it) {
-        if (it->id == id.value) {
-            return &(*it);
-        }
+    auto it = index_.find(id.value);
+    if (it != index_.end()) {
+        return &(*it->second);
     }
     return nullptr;
 }
 
-const std::deque<TraceEntry>& TraceOutput::entries() const { return entries_; }
+const std::list<TraceEntry>& TraceOutput::entries() const { return entries_; }
 std::size_t TraceOutput::len() const { return entries_.size(); }
 bool TraceOutput::is_empty() const { return entries_.empty(); }
 
-void TraceOutput::clear() { entries_.clear(); }
+void TraceOutput::clear() { entries_.clear(); index_.clear(); }
 
 std::string TraceOutput::write_text() const {
     std::string out;

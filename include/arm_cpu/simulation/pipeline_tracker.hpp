@@ -115,6 +115,10 @@ public:
     /// Record instruction fetch
     void record_fetch(const Instruction& instr, uint64_t cycle);
 
+    /// Evict oldest entries beyond max_instructions_ to prevent unbounded growth.
+    /// Safe to call only for fully retired instructions.
+    void evict_old_entries();
+
     /// Record instruction decode
     void record_decode(InstructionId id, uint64_t start, uint64_t end);
 
@@ -173,6 +177,7 @@ private:
     uint64_t next_viz_id_ = 0;
     uint64_t retire_counter_ = 0;
     std::size_t max_completed_;
+    std::size_t max_instructions_;
     std::deque<InstructionId> completed_;
     std::unordered_map<InstructionId, std::vector<DependencyRef>, InstructionId::Hash> dependencies_;
 };

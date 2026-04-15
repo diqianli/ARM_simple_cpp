@@ -15,6 +15,7 @@
 #include <cstddef>
 #include <deque>
 #include <functional>
+#include <list>
 #include <optional>
 #include <string>
 #include <unordered_map>
@@ -126,7 +127,7 @@ public:
     void record_complete(InstructionId id, uint64_t cycle);
     void record_commit(InstructionId id, uint64_t cycle);
 
-    const std::deque<TraceEntry>& entries() const;
+    const std::list<TraceEntry>& entries() const;
     std::size_t len() const;
     bool is_empty() const;
     void clear();
@@ -144,7 +145,8 @@ private:
     void add_entry(TraceEntry entry);
     TraceEntry* find_entry_mut(InstructionId id);
 
-    std::deque<TraceEntry> entries_;
+    std::list<TraceEntry> entries_;
+    std::unordered_map<uint64_t, std::list<TraceEntry>::iterator> index_;
     std::size_t max_entries_;
     bool enabled_;
 };

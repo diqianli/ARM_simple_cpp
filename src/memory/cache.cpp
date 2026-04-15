@@ -170,8 +170,9 @@ std::optional<uint64_t> Cache::fill_line(uint64_t addr) {
     auto line_bits = static_cast<uint32_t>(std::log2(config_.line_size));
 
     auto& set = sets_[set_idx];
-    if (set.find(tag).has_value()) {
-        set.update_lru(*set.find(tag));
+    auto hit_way = set.find(tag);
+    if (hit_way.has_value()) {
+        set.update_lru(*hit_way);
         return std::nullopt;
     }
 

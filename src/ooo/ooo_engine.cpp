@@ -49,17 +49,14 @@ void OoOEngine::mark_completed(InstructionId id, uint64_t complete_cycle) {
 std::size_t OoOEngine::process_completions() {
     newly_ready_.clear();
 
-    std::vector<uint64_t> due_cycles;
-    for (const auto& [cycle, _] : pending_completions_) {
-        if (cycle <= current_cycle_) due_cycles.push_back(cycle);
-    }
-
     std::size_t count = 0;
-    for (auto cycle : due_cycles) {
-        auto it = pending_completions_.find(cycle);
-        if (it == pending_completions_.end()) continue;
+
+    // Use lower_bound to find the first due cycle, then iterate only due entries
+    auto it = pending_completions_.begin();
+    while (it != pending_completions_.end() && it->first <= current_cycle_) {
+        auto cycle = it->first;
         auto ids = std::move(it->second);
-        pending_completions_.erase(it);
+        it = pending_completions_.erase(it);
 
         for (auto id : ids) {
             count++;

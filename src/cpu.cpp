@@ -7,7 +7,6 @@
 #include "arm_cpu/chi/chi_manager.hpp"
 #include "arm_cpu/memory/memory_subsystem.hpp"
 #include "arm_cpu/ooo/ooo_engine.hpp"
-#include "arm_cpu/simulation/pipeline_tracker.hpp"
 #include "arm_cpu/visualization/visualization_state.hpp"
 
 #include <algorithm>
@@ -29,8 +28,7 @@ CPUEmulator::CPUEmulator(CPUConfig config,
                          std::unique_ptr<ChiManager> chi_manager,
                          StatsCollector stats,
                          TraceOutput trace,
-                         std::unique_ptr<VisualizationState> visualization,
-                         std::unique_ptr<PipelineTracker> pipeline_tracker)
+                         std::unique_ptr<VisualizationState> visualization)
     : config_(std::move(config))
     , ooo_engine_(std::move(ooo_engine))
     , memory_(std::move(memory))
@@ -38,7 +36,6 @@ CPUEmulator::CPUEmulator(CPUConfig config,
     , stats_(std::move(stats))
     , trace_(std::move(trace))
     , visualization_(std::move(visualization))
-    , pipeline_tracker_(std::move(pipeline_tracker))
     , current_cycle_(0)
     , committed_count_(0)
     , running_(false)
@@ -76,7 +73,6 @@ Result<std::unique_ptr<CPUEmulator>> CPUEmulator::create(CPUConfig config) {
     }
 
     auto visualization = std::make_unique<VisualizationState>(VisualizationConfig{});
-    auto pipeline_tracker = std::make_unique<PipelineTracker>();
 
     return std::unique_ptr<CPUEmulator>(new CPUEmulator(
         std::move(config),
@@ -85,8 +81,7 @@ Result<std::unique_ptr<CPUEmulator>> CPUEmulator::create(CPUConfig config) {
         std::move(chi_manager),
         std::move(stats),
         std::move(trace),
-        std::move(visualization),
-        std::move(pipeline_tracker)
+        std::move(visualization)
     ));
 }
 
@@ -114,7 +109,6 @@ Result<std::unique_ptr<CPUEmulator>> CPUEmulator::create_with_visualization(
     }
 
     auto visualization = std::make_unique<VisualizationState>(std::move(viz_config));
-    auto pipeline_tracker = std::make_unique<PipelineTracker>();
 
     return std::unique_ptr<CPUEmulator>(new CPUEmulator(
         std::move(config),
@@ -123,8 +117,7 @@ Result<std::unique_ptr<CPUEmulator>> CPUEmulator::create_with_visualization(
         std::move(chi_manager),
         std::move(stats),
         std::move(trace),
-        std::move(visualization),
-        std::move(pipeline_tracker)
+        std::move(visualization)
     ));
 }
 
@@ -221,6 +214,14 @@ Result<PerformanceMetrics> CPUEmulator::run_with_limit(
                 static_cast<unsigned long long>(committed_count_));
             running_ = false;
         }
+
+        // Progress output (prevents Windows terminal from appearing unresponsive)
+        if (current_cycle_ % 100000 == 0 && current_cycle_ > 0) {
+            std::fprintf(stderr, "[cycle %llu] committed=%llu window=%zu\n",
+                static_cast<unsigned long long>(current_cycle_),
+                static_cast<unsigned long long>(committed_count_),
+                ooo_engine_->window_size());
+        }
     }
 
     return get_metrics();
@@ -274,8 +275,6 @@ Result<void> CPUEmulator::dispatch(Instruction instr) {
     trace_.record_dispatch(instr, current_cycle_);
 
     // Track pipeline stages for visualization
-    pipeline_tracker_->record_fetch(instr, current_cycle_);
-    pipeline_tracker_->record_dispatch(instr_id, current_cycle_);
     visualization_->pipeline_tracker().record_fetch(instr, current_cycle_);
     visualization_->pipeline_tracker().record_dispatch(instr_id, current_cycle_);
 
@@ -284,7 +283,6 @@ Result<void> CPUEmulator::dispatch(Instruction instr) {
 
     // Record dependencies for visualization
     for (const auto& dep : dependencies) {
-        pipeline_tracker_->add_dependency(instr_id, dep.producer, dep.is_memory);
         visualization_->pipeline_tracker().add_dependency(instr_id, dep.producer, dep.is_memory);
     }
 
@@ -331,7 +329,6 @@ Result<void> CPUEmulator::execute() {
         trace_.record_issue(id, current_cycle_);
 
         // Track issue stage for visualization
-        pipeline_tracker_->record_issue(id, current_cycle_);
         visualization_->pipeline_tracker().record_issue(id, current_cycle_);
 
         if (is_memory_op(instr.opcode_type)) {
@@ -343,8 +340,6 @@ Result<void> CPUEmulator::execute() {
                 uint64_t complete_cycle = current_cycle_ + config_.l1_hit_latency;
                 ooo_engine_->mark_completed(id, complete_cycle);
 
-                pipeline_tracker_->record_memory(id, current_cycle_, complete_cycle);
-                pipeline_tracker_->record_complete(id, complete_cycle);
                 visualization_->pipeline_tracker().record_memory(id, current_cycle_, complete_cycle);
                 visualization_->pipeline_tracker().record_complete(id, complete_cycle);
             }
@@ -355,8 +350,6 @@ Result<void> CPUEmulator::execute() {
             ooo_engine_->mark_completed(id, complete_cycle);
 
             // Track execute and complete for visualization
-            pipeline_tracker_->record_execute(id, current_cycle_, complete_cycle);
-            pipeline_tracker_->record_complete(id, complete_cycle);
             visualization_->pipeline_tracker().record_execute_start(id, current_cycle_);
             visualization_->pipeline_tracker().record_execute_end(id, complete_cycle);
             visualization_->pipeline_tracker().record_complete(id, complete_cycle);
@@ -379,8 +372,6 @@ Result<void> CPUEmulator::handle_memory_op(InstructionId id, const MemAccess& ac
     ooo_engine_->mark_completed(id, complete_cycle);
 
     // Track memory stage for visualization
-    pipeline_tracker_->record_memory(id, current_cycle_, complete_cycle);
-    pipeline_tracker_->record_complete(id, complete_cycle);
     visualization_->pipeline_tracker().record_memory(id, current_cycle_, complete_cycle);
     visualization_->pipeline_tracker().record_complete(id, complete_cycle);
 
@@ -433,7 +424,6 @@ Result<void> CPUEmulator::commit() {
         committed_count_++;
 
         // Track retire stage for visualization
-        pipeline_tracker_->record_retire(id, current_cycle_);
         visualization_->pipeline_tracker().record_retire(id, current_cycle_);
 
         stats_.record_commit(instr, current_cycle_);
@@ -487,7 +477,6 @@ void CPUEmulator::reset() {
     stats_.reset();
     trace_.clear();
     visualization_->clear();
-    pipeline_tracker_->clear();
     current_cycle_ = 0;
     committed_count_ = 0;
     running_ = false;

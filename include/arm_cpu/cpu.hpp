@@ -24,7 +24,6 @@ namespace arm_cpu {
 class OoOEngine;
 class MemorySubsystem;
 class ChiManager;
-class PipelineTracker;
 class VisualizationState;
 class PipelineTrackerViz;
 
@@ -108,12 +107,6 @@ public:
     /// Get mutable visualization state.
     VisualizationState& visualization_mut() { return *visualization_; }
 
-    /// Get pipeline tracker for Konata visualization (const).
-    const PipelineTracker& pipeline_tracker() const { return *pipeline_tracker_; }
-
-    /// Get mutable pipeline tracker.
-    PipelineTracker& pipeline_tracker_mut() { return *pipeline_tracker_; }
-
     ~CPUEmulator(); // Defined in cpu.cpp (needs complete types for unique_ptr members)
 
 private:
@@ -123,8 +116,7 @@ private:
                 std::unique_ptr<ChiManager> chi_manager,
                 StatsCollector stats,
                 TraceOutput trace,
-                std::unique_ptr<VisualizationState> visualization,
-                std::unique_ptr<PipelineTracker> pipeline_tracker);
+                std::unique_ptr<VisualizationState> visualization);
 
     void fetch_dispatch(
         std::function<std::optional<Result<Instruction>>()> next_instr);
@@ -142,7 +134,6 @@ private:
     StatsCollector stats_;
     TraceOutput trace_;
     std::unique_ptr<VisualizationState> visualization_;
-    std::unique_ptr<PipelineTracker> pipeline_tracker_;
     uint64_t current_cycle_ = 0;
     uint64_t committed_count_ = 0;
     bool running_ = false;

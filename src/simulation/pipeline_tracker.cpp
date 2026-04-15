@@ -98,10 +98,12 @@ std::vector<StageInfo> StageTiming::to_stages() const {
 
 PipelineTracker::PipelineTracker()
     : max_completed_(10000)
+    , max_instructions_(10000)
 {}
 
 PipelineTracker::PipelineTracker(std::size_t max_completed)
     : max_completed_(max_completed)
+    , max_instructions_(max_completed > 0 ? max_completed : 10000)
 {}
 
 uint64_t PipelineTracker::get_or_assign_viz_id(InstructionId id) {
@@ -236,6 +238,11 @@ void PipelineTracker::record_complete(InstructionId id, uint64_t cycle) {
 void PipelineTracker::record_retire(InstructionId id, uint64_t cycle) {
     timings_[id].record_retire(cycle);
     retire_counter_++;
+
+    // Periodically evict old entries to prevent unbounded growth
+    if (retire_counter_ % 1000 == 0 && timings_.size() > max_instructions_) {
+        evict_old_entries();
+    }
 }
 
 void PipelineTracker::add_dependency(InstructionId consumer, InstructionId producer, bool is_memory_dep) {
@@ -278,6 +285,31 @@ std::size_t PipelineTracker::len() const {
 
 bool PipelineTracker::is_empty() const {
     return timings_.empty();
+}
+
+void PipelineTracker::evict_old_entries() {
+    // Remove entries from the front of order_ that are fully retired
+    // (have both complete and retire cycles set) until we're under the limit.
+    std::size_t target = max_instructions_ / 2; // Evict down to half to amortize cost
+    while (order_.size() > target && !order_.empty()) {
+        InstructionId oldest = order_.front();
+        auto timing_it = timings_.find(oldest);
+        if (timing_it == timings_.end()) {
+            order_.pop_front();
+            continue;
+        }
+        const auto& timing = timing_it->second;
+        // Only evict fully retired instructions
+        if (timing.retire_cycle.has_value()) {
+            timings_.erase(oldest);
+            instructions_.erase(oldest);
+            viz_id_map_.erase(oldest);
+            dependencies_.erase(oldest);
+            order_.pop_front();
+        } else {
+            break; // Stop at first non-retired instruction
+        }
+    }
 }
 
 void PipelineTracker::clear() {
