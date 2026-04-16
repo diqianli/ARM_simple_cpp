@@ -114,6 +114,8 @@ void PipelineTrackerViz::record_fetch(const Instruction& instr, uint64_t cycle) 
         order_.push_back(id);
     }
 
+    pc_map_[id] = instr.pc;
+
     if (instr.disasm.has_value()) {
         disasm_map_[id] = *instr.disasm;
     }
@@ -382,7 +384,11 @@ std::vector<KonataOp> PipelineTrackerViz::export_all_konata_ops() const {
         auto disasm_it = disasm_map_.find(id);
         if (disasm_it != disasm_map_.end()) disasm = disasm_it->second;
 
-        KonataOp op(viz_id, id.value, 0, disasm);
+        uint64_t pc = 0;
+        auto pc_it = pc_map_.find(id);
+        if (pc_it != pc_map_.end()) pc = pc_it->second;
+
+        KonataOp op(viz_id, id.value, pc, disasm);
         op.fetched_cycle = timing.fetch_start.value_or(0);
         op.retired_cycle = timing.retire_cycle;
 

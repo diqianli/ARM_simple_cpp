@@ -132,6 +132,7 @@ private:
     std::size_t max_completed_ = 1000;
 
     std::unordered_map<InstructionId, std::vector<TrackerDependencyInfo>, InstructionId::Hash> dependencies_;
+    std::unordered_map<InstructionId, uint64_t, InstructionId::Hash> pc_map_;
     std::unordered_map<InstructionId, std::string, InstructionId::Hash> disasm_map_;
     std::unordered_map<InstructionId, std::vector<uint16_t>, InstructionId::Hash> src_regs_map_;
     std::unordered_map<InstructionId, std::vector<uint16_t>, InstructionId::Hash> dst_regs_map_;
