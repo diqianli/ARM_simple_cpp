@@ -1,0 +1,2349 @@
+{
+  "ops": [
+    {
+      "fetched_cycle": 0,
+      "gid": 0,
+      "id": 0,
+      "is_memory": true,
+      "label_name": "stp x29, x30, [sp, #-0x10]!",
+      "lanes": {
+        "main": {
+          "name": "main",
+          "stages": [
+            {
+              "end_cycle": 1,
+              "name": "IF",
+              "start_cycle": 0
+            },
+            {
+              "end_cycle": 2,
+              "name": "DE",
+              "start_cycle": 1
+            },
+            {
+              "end_cycle": 3,
+              "name": "RN",
+              "start_cycle": 2
+            },
+            {
+              "end_cycle": 4,
+              "name": "DI",
+              "start_cycle": 3
+            },
+            {
+              "end_cycle": 5,
+              "name": "IS",
+              "start_cycle": 4
+            },
+            {
+              "end_cycle": 6,
+              "name": "ME:L1",
+              "start_cycle": 5
+            },
+            {
+              "end_cycle": 7,
+              "name": "WB",
+              "start_cycle": 6
+            },
+            {
+              "end_cycle": 8,
+              "name": "RR",
+              "start_cycle": 7
+            }
+          ]
+        }
+      },
+      "mem_addr": 0,
+      "pc": 0,
+      "retired_cycle": 4,
+      "rid": 1,
+      "src_regs": [
+        31
+      ]
+    },
+    {
+      "fetched_cycle": 0,
+      "gid": 1,
+      "id": 1,
+      "label_name": "mov w1, #0x1f4",
+      "lanes": {
+        "main": {
+          "name": "main",
+          "stages": [
+            {
+              "end_cycle": 1,
+              "name": "IF",
+              "start_cycle": 0
+            },
+            {
+              "end_cycle": 2,
+              "name": "DE",
+              "start_cycle": 1
+            },
+            {
+              "end_cycle": 3,
+              "name": "RN",
+              "start_cycle": 2
+            },
+            {
+              "end_cycle": 4,
+              "name": "DI",
+              "start_cycle": 3
+            },
+            {
+              "end_cycle": 5,
+              "name": "IS",
+              "start_cycle": 4
+            },
+            {
+              "end_cycle": 6,
+              "name": "EX",
+              "start_cycle": 5
+            },
+            {
+              "end_cycle": 7,
+              "name": "WB",
+              "start_cycle": 6
+            },
+            {
+              "end_cycle": 8,
+              "name": "RR",
+              "start_cycle": 7
+            }
+          ]
+        }
+      },
+      "pc": 0,
+      "retired_cycle": 4,
+      "rid": 2
+    },
+    {
+      "fetched_cycle": 0,
+      "gid": 2,
+      "id": 2,
+      "label_name": "adrp x0, #0x11000",
+      "lanes": {
+        "main": {
+          "name": "main",
+          "stages": [
+            {
+              "end_cycle": 1,
+              "name": "IF",
+              "start_cycle": 0
+            },
+            {
+              "end_cycle": 2,
+              "name": "DE",
+              "start_cycle": 1
+            },
+            {
+              "end_cycle": 3,
+              "name": "RN",
+              "start_cycle": 2
+            },
+            {
+              "end_cycle": 4,
+              "name": "DI",
+              "start_cycle": 3
+            },
+            {
+              "end_cycle": 5,
+              "name": "IS",
+              "start_cycle": 4
+            },
+            {
+              "end_cycle": 6,
+              "name": "EX",
+              "start_cycle": 5
+            },
+            {
+              "end_cycle": 7,
+              "name": "WB",
+              "start_cycle": 6
+            },
+            {
+              "end_cycle": 8,
+              "name": "RR",
+              "start_cycle": 7
+            }
+          ]
+        }
+      },
+      "pc": 0,
+      "retired_cycle": 4,
+      "rid": 3
+    },
+    {
+      "fetched_cycle": 0,
+      "gid": 3,
+      "id": 3,
+      "label_name": "mov x29, sp",
+      "lanes": {
+        "main": {
+          "name": "main",
+          "stages": [
+            {
+              "end_cycle": 1,
+              "name": "IF",
+              "start_cycle": 0
+            },
+            {
+              "end_cycle": 2,
+              "name": "DE",
+              "start_cycle": 1
+            },
+            {
+              "end_cycle": 3,
+              "name": "RN",
+              "start_cycle": 2
+            },
+            {
+              "end_cycle": 4,
+              "name": "DI",
+              "start_cycle": 3
+            },
+            {
+              "end_cycle": 5,
+              "name": "IS",
+              "start_cycle": 4
+            },
+            {
+              "end_cycle": 6,
+              "name": "EX",
+              "start_cycle": 5
+            },
+            {
+              "end_cycle": 7,
+              "name": "WB",
+              "start_cycle": 6
+            },
+            {
+              "end_cycle": 8,
+              "name": "RR",
+              "start_cycle": 7
+            }
+          ]
+        }
+      },
+      "pc": 0,
+      "retired_cycle": 4,
+      "rid": 4,
+      "src_regs": [
+        31
+      ]
+    },
+    {
+      "fetched_cycle": 0,
+      "gid": 4,
+      "id": 4,
+      "label_name": "add x0, x0, #0xb0",
+      "lanes": {
+        "main": {
+          "name": "main",
+          "stages": [
+            {
+              "end_cycle": 1,
+              "name": "IF",
+              "start_cycle": 0
+            },
+            {
+              "end_cycle": 2,
+              "name": "DE",
+              "start_cycle": 1
+            },
+            {
+              "end_cycle": 3,
+              "name": "RN",
+              "start_cycle": 2
+            },
+            {
+              "end_cycle": 4,
+              "name": "DI",
+              "start_cycle": 3
+            },
+            {
+              "end_cycle": 5,
+              "name": "IS",
+              "start_cycle": 4
+            },
+            {
+              "end_cycle": 6,
+              "name": "EX",
+              "start_cycle": 5
+            },
+            {
+              "end_cycle": 7,
+              "name": "WB",
+              "start_cycle": 6
+            },
+            {
+              "end_cycle": 8,
+              "name": "RR",
+              "start_cycle": 7
+            }
+          ]
+        }
+      },
+      "pc": 0,
+      "retired_cycle": 5,
+      "rid": 5
+    },
+    {
+      "fetched_cycle": 0,
+      "gid": 5,
+      "id": 5,
+      "label_name": "bl #0x106c",
+      "lanes": {
+        "main": {
+          "name": "main",
+          "stages": [
+            {
+              "end_cycle": 1,
+              "name": "IF",
+              "start_cycle": 0
+            },
+            {
+              "end_cycle": 2,
+              "name": "DE",
+              "start_cycle": 1
+            },
+            {
+              "end_cycle": 3,
+              "name": "RN",
+              "start_cycle": 2
+            },
+            {
+              "end_cycle": 4,
+              "name": "DI",
+              "start_cycle": 3
+            },
+            {
+              "end_cycle": 5,
+              "name": "IS",
+              "start_cycle": 4
+            },
+            {
+              "end_cycle": 6,
+              "name": "EX",
+              "start_cycle": 5
+            },
+            {
+              "end_cycle": 7,
+              "name": "WB",
+              "start_cycle": 6
+            },
+            {
+              "end_cycle": 8,
+              "name": "RR",
+              "start_cycle": 7
+            }
+          ]
+        }
+      },
+      "pc": 0,
+      "retired_cycle": 5,
+      "rid": 6
+    },
+    {
+      "fetched_cycle": 0,
+      "gid": 6,
+      "id": 6,
+      "is_memory": true,
+      "label_name": "ldp x29, x30, [sp], #0x10",
+      "lanes": {
+        "main": {
+          "name": "main",
+          "stages": [
+            {
+              "end_cycle": 1,
+              "name": "IF",
+              "start_cycle": 0
+            },
+            {
+              "end_cycle": 2,
+              "name": "DE",
+              "start_cycle": 1
+            },
+            {
+              "end_cycle": 3,
+              "name": "RN",
+              "start_cycle": 2
+            },
+            {
+              "end_cycle": 4,
+              "name": "DI",
+              "start_cycle": 3
+            },
+            {
+              "end_cycle": 9,
+              "name": "IS",
+              "start_cycle": 4
+            },
+            {
+              "end_cycle": 13,
+              "name": "ME:L1",
+              "start_cycle": 9
+            },
+            {
+              "end_cycle": 14,
+              "name": "WB",
+              "start_cycle": 13
+            },
+            {
+              "end_cycle": 15,
+              "name": "RR",
+              "start_cycle": 14
+            }
+          ]
+        }
+      },
+      "mem_addr": 0,
+      "pc": 0,
+      "prods": [
+        {
+          "producer_id": 0,
+          "type": "memory"
+        }
+      ],
+      "retired_cycle": 13,
+      "rid": 7,
+      "src_regs": [
+        31
+      ]
+    },
+    {
+      "fetched_cycle": 0,
+      "gid": 7,
+      "id": 7,
+      "label_name": "mov w1, #0x1f4",
+      "lanes": {
+        "main": {
+          "name": "main",
+          "stages": [
+            {
+              "end_cycle": 1,
+              "name": "IF",
+              "start_cycle": 0
+            },
+            {
+              "end_cycle": 2,
+              "name": "DE",
+              "start_cycle": 1
+            },
+            {
+              "end_cycle": 3,
+              "name": "RN",
+              "start_cycle": 2
+            },
+            {
+              "end_cycle": 4,
+              "name": "DI",
+              "start_cycle": 3
+            },
+            {
+              "end_cycle": 5,
+              "name": "IS",
+              "start_cycle": 4
+            },
+            {
+              "end_cycle": 6,
+              "name": "EX",
+              "start_cycle": 5
+            },
+            {
+              "end_cycle": 7,
+              "name": "WB",
+              "start_cycle": 6
+            },
+            {
+              "end_cycle": 13,
+              "name": "RR",
+              "start_cycle": 7
+            }
+          ]
+        }
+      },
+      "pc": 0,
+      "retired_cycle": 13,
+      "rid": 8
+    },
+    {
+      "fetched_cycle": 1,
+      "gid": 8,
+      "id": 8,
+      "label_name": "b #0x1020",
+      "lanes": {
+        "main": {
+          "name": "main",
+          "stages": [
+            {
+              "end_cycle": 2,
+              "name": "IF",
+              "start_cycle": 1
+            },
+            {
+              "end_cycle": 3,
+              "name": "DE",
+              "start_cycle": 2
+            },
+            {
+              "end_cycle": 4,
+              "name": "RN",
+              "start_cycle": 3
+            },
+            {
+              "end_cycle": 5,
+              "name": "DI",
+              "start_cycle": 4
+            },
+            {
+              "end_cycle": 6,
+              "name": "IS",
+              "start_cycle": 5
+            },
+            {
+              "end_cycle": 7,
+              "name": "EX",
+              "start_cycle": 6
+            },
+            {
+              "end_cycle": 8,
+              "name": "WB",
+              "start_cycle": 7
+            },
+            {
+              "end_cycle": 13,
+              "name": "RR",
+              "start_cycle": 8
+            }
+          ]
+        }
+      },
+      "pc": 0,
+      "retired_cycle": 13,
+      "rid": 9
+    },
+    {
+      "fetched_cycle": 1,
+      "gid": 9,
+      "id": 9,
+      "label_name": "nop",
+      "lanes": {
+        "main": {
+          "name": "main",
+          "stages": [
+            {
+              "end_cycle": 2,
+              "name": "IF",
+              "start_cycle": 1
+            },
+            {
+              "end_cycle": 3,
+              "name": "DE",
+              "start_cycle": 2
+            },
+            {
+              "end_cycle": 4,
+              "name": "RN",
+              "start_cycle": 3
+            },
+            {
+              "end_cycle": 5,
+              "name": "DI",
+              "start_cycle": 4
+            },
+            {
+              "end_cycle": 6,
+              "name": "IS",
+              "start_cycle": 5
+            },
+            {
+              "end_cycle": 7,
+              "name": "EX",
+              "start_cycle": 6
+            },
+            {
+              "end_cycle": 8,
+              "name": "WB",
+              "start_cycle": 7
+            },
+            {
+              "end_cycle": 13,
+              "name": "RR",
+              "start_cycle": 8
+            }
+          ]
+        }
+      },
+      "pc": 0,
+      "retired_cycle": 13,
+      "rid": 10
+    },
+    {
+      "fetched_cycle": 1,
+      "gid": 10,
+      "id": 10,
+      "label_name": "nop",
+      "lanes": {
+        "main": {
+          "name": "main",
+          "stages": [
+            {
+              "end_cycle": 2,
+              "name": "IF",
+              "start_cycle": 1
+            },
+            {
+              "end_cycle": 3,
+              "name": "DE",
+              "start_cycle": 2
+            },
+            {
+              "end_cycle": 4,
+              "name": "RN",
+              "start_cycle": 3
+            },
+            {
+              "end_cycle": 5,
+              "name": "DI",
+              "start_cycle": 4
+            },
+            {
+              "end_cycle": 6,
+              "name": "IS",
+              "start_cycle": 5
+            },
+            {
+              "end_cycle": 7,
+              "name": "EX",
+              "start_cycle": 6
+            },
+            {
+              "end_cycle": 8,
+              "name": "WB",
+              "start_cycle": 7
+            },
+            {
+              "end_cycle": 14,
+              "name": "RR",
+              "start_cycle": 8
+            }
+          ]
+        }
+      },
+      "pc": 0,
+      "retired_cycle": 14,
+      "rid": 11
+    },
+    {
+      "fetched_cycle": 1,
+      "gid": 11,
+      "id": 11,
+      "label_name": "nop",
+      "lanes": {
+        "main": {
+          "name": "main",
+          "stages": [
+            {
+              "end_cycle": 2,
+              "name": "IF",
+              "start_cycle": 1
+            },
+            {
+              "end_cycle": 3,
+              "name": "DE",
+              "start_cycle": 2
+            },
+            {
+              "end_cycle": 4,
+              "name": "RN",
+              "start_cycle": 3
+            },
+            {
+              "end_cycle": 5,
+              "name": "DI",
+              "start_cycle": 4
+            },
+            {
+              "end_cycle": 6,
+              "name": "IS",
+              "start_cycle": 5
+            },
+            {
+              "end_cycle": 7,
+              "name": "EX",
+              "start_cycle": 6
+            },
+            {
+              "end_cycle": 8,
+              "name": "WB",
+              "start_cycle": 7
+            },
+            {
+              "end_cycle": 14,
+              "name": "RR",
+              "start_cycle": 8
+            }
+          ]
+        }
+      },
+      "pc": 0,
+      "retired_cycle": 14,
+      "rid": 12
+    },
+    {
+      "fetched_cycle": 1,
+      "gid": 12,
+      "id": 12,
+      "label_name": "nop",
+      "lanes": {
+        "main": {
+          "name": "main",
+          "stages": [
+            {
+              "end_cycle": 2,
+              "name": "IF",
+              "start_cycle": 1
+            },
+            {
+              "end_cycle": 3,
+              "name": "DE",
+              "start_cycle": 2
+            },
+            {
+              "end_cycle": 4,
+              "name": "RN",
+              "start_cycle": 3
+            },
+            {
+              "end_cycle": 5,
+              "name": "DI",
+              "start_cycle": 4
+            },
+            {
+              "end_cycle": 6,
+              "name": "IS",
+              "start_cycle": 5
+            },
+            {
+              "end_cycle": 7,
+              "name": "EX",
+              "start_cycle": 6
+            },
+            {
+              "end_cycle": 8,
+              "name": "WB",
+              "start_cycle": 7
+            },
+            {
+              "end_cycle": 14,
+              "name": "RR",
+              "start_cycle": 8
+            }
+          ]
+        }
+      },
+      "pc": 0,
+      "retired_cycle": 14,
+      "rid": 13
+    },
+    {
+      "fetched_cycle": 1,
+      "gid": 13,
+      "id": 13,
+      "label_name": "nop",
+      "lanes": {
+        "main": {
+          "name": "main",
+          "stages": [
+            {
+              "end_cycle": 2,
+              "name": "IF",
+              "start_cycle": 1
+            },
+            {
+              "end_cycle": 3,
+              "name": "DE",
+              "start_cycle": 2
+            },
+            {
+              "end_cycle": 4,
+              "name": "RN",
+              "start_cycle": 3
+            },
+            {
+              "end_cycle": 5,
+              "name": "DI",
+              "start_cycle": 4
+            },
+            {
+              "end_cycle": 6,
+              "name": "IS",
+              "start_cycle": 5
+            },
+            {
+              "end_cycle": 7,
+              "name": "EX",
+              "start_cycle": 6
+            },
+            {
+              "end_cycle": 8,
+              "name": "WB",
+              "start_cycle": 7
+            },
+            {
+              "end_cycle": 14,
+              "name": "RR",
+              "start_cycle": 8
+            }
+          ]
+        }
+      },
+      "pc": 0,
+      "retired_cycle": 14,
+      "rid": 14
+    },
+    {
+      "fetched_cycle": 1,
+      "gid": 14,
+      "id": 14,
+      "label_name": "nop",
+      "lanes": {
+        "main": {
+          "name": "main",
+          "stages": [
+            {
+              "end_cycle": 2,
+              "name": "IF",
+              "start_cycle": 1
+            },
+            {
+              "end_cycle": 3,
+              "name": "DE",
+              "start_cycle": 2
+            },
+            {
+              "end_cycle": 4,
+              "name": "RN",
+              "start_cycle": 3
+            },
+            {
+              "end_cycle": 5,
+              "name": "DI",
+              "start_cycle": 4
+            },
+            {
+              "end_cycle": 6,
+              "name": "IS",
+              "start_cycle": 5
+            },
+            {
+              "end_cycle": 7,
+              "name": "EX",
+              "start_cycle": 6
+            },
+            {
+              "end_cycle": 8,
+              "name": "WB",
+              "start_cycle": 7
+            },
+            {
+              "end_cycle": 15,
+              "name": "RR",
+              "start_cycle": 8
+            }
+          ]
+        }
+      },
+      "pc": 0,
+      "retired_cycle": 15,
+      "rid": 15
+    },
+    {
+      "fetched_cycle": 1,
+      "gid": 15,
+      "id": 15,
+      "label_name": "nop",
+      "lanes": {
+        "main": {
+          "name": "main",
+          "stages": [
+            {
+              "end_cycle": 2,
+              "name": "IF",
+              "start_cycle": 1
+            },
+            {
+              "end_cycle": 3,
+              "name": "DE",
+              "start_cycle": 2
+            },
+            {
+              "end_cycle": 4,
+              "name": "RN",
+              "start_cycle": 3
+            },
+            {
+              "end_cycle": 5,
+              "name": "DI",
+              "start_cycle": 4
+            },
+            {
+              "end_cycle": 6,
+              "name": "IS",
+              "start_cycle": 5
+            },
+            {
+              "end_cycle": 7,
+              "name": "EX",
+              "start_cycle": 6
+            },
+            {
+              "end_cycle": 8,
+              "name": "WB",
+              "start_cycle": 7
+            },
+            {
+              "end_cycle": 15,
+              "name": "RR",
+              "start_cycle": 8
+            }
+          ]
+        }
+      },
+      "pc": 0,
+      "retired_cycle": 15,
+      "rid": 16
+    },
+    {
+      "fetched_cycle": 2,
+      "gid": 16,
+      "id": 16,
+      "label_name": "cmp w1, #0",
+      "lanes": {
+        "main": {
+          "name": "main",
+          "stages": [
+            {
+              "end_cycle": 3,
+              "name": "IF",
+              "start_cycle": 2
+            },
+            {
+              "end_cycle": 4,
+              "name": "DE",
+              "start_cycle": 3
+            },
+            {
+              "end_cycle": 5,
+              "name": "RN",
+              "start_cycle": 4
+            },
+            {
+              "end_cycle": 6,
+              "name": "DI",
+              "start_cycle": 5
+            },
+            {
+              "end_cycle": 7,
+              "name": "IS",
+              "start_cycle": 6
+            },
+            {
+              "end_cycle": 8,
+              "name": "EX",
+              "start_cycle": 7
+            },
+            {
+              "end_cycle": 9,
+              "name": "WB",
+              "start_cycle": 8
+            },
+            {
+              "end_cycle": 15,
+              "name": "RR",
+              "start_cycle": 9
+            }
+          ]
+        }
+      },
+      "pc": 0,
+      "retired_cycle": 15,
+      "rid": 17
+    },
+    {
+      "fetched_cycle": 2,
+      "gid": 17,
+      "id": 17,
+      "label_name": "b.le #0x1030",
+      "lanes": {
+        "main": {
+          "name": "main",
+          "stages": [
+            {
+              "end_cycle": 3,
+              "name": "IF",
+              "start_cycle": 2
+            },
+            {
+              "end_cycle": 4,
+              "name": "DE",
+              "start_cycle": 3
+            },
+            {
+              "end_cycle": 5,
+              "name": "RN",
+              "start_cycle": 4
+            },
+            {
+              "end_cycle": 6,
+              "name": "DI",
+              "start_cycle": 5
+            },
+            {
+              "end_cycle": 7,
+              "name": "IS",
+              "start_cycle": 6
+            },
+            {
+              "end_cycle": 8,
+              "name": "EX",
+              "start_cycle": 7
+            },
+            {
+              "end_cycle": 9,
+              "name": "WB",
+              "start_cycle": 8
+            },
+            {
+              "end_cycle": 15,
+              "name": "RR",
+              "start_cycle": 9
+            }
+          ]
+        }
+      },
+      "pc": 0,
+      "retired_cycle": 15,
+      "rid": 18
+    },
+    {
+      "fetched_cycle": 2,
+      "gid": 18,
+      "id": 18,
+      "label_name": "mov x2, x0",
+      "lanes": {
+        "main": {
+          "name": "main",
+          "stages": [
+            {
+              "end_cycle": 3,
+              "name": "IF",
+              "start_cycle": 2
+            },
+            {
+              "end_cycle": 4,
+              "name": "DE",
+              "start_cycle": 3
+            },
+            {
+              "end_cycle": 5,
+              "name": "RN",
+              "start_cycle": 4
+            },
+            {
+              "end_cycle": 6,
+              "name": "DI",
+              "start_cycle": 5
+            },
+            {
+              "end_cycle": 7,
+              "name": "IS",
+              "start_cycle": 6
+            },
+            {
+              "end_cycle": 8,
+              "name": "EX",
+              "start_cycle": 7
+            },
+            {
+              "end_cycle": 9,
+              "name": "WB",
+              "start_cycle": 8
+            },
+            {
+              "end_cycle": 16,
+              "name": "RR",
+              "start_cycle": 9
+            }
+          ]
+        }
+      },
+      "pc": 0,
+      "retired_cycle": 16,
+      "rid": 19
+    },
+    {
+      "fetched_cycle": 2,
+      "gid": 19,
+      "id": 19,
+      "label_name": "add x1, x0, w1, uxtw #2",
+      "lanes": {
+        "main": {
+          "name": "main",
+          "stages": [
+            {
+              "end_cycle": 3,
+              "name": "IF",
+              "start_cycle": 2
+            },
+            {
+              "end_cycle": 4,
+              "name": "DE",
+              "start_cycle": 3
+            },
+            {
+              "end_cycle": 5,
+              "name": "RN",
+              "start_cycle": 4
+            },
+            {
+              "end_cycle": 6,
+              "name": "DI",
+              "start_cycle": 5
+            },
+            {
+              "end_cycle": 7,
+              "name": "IS",
+              "start_cycle": 6
+            },
+            {
+              "end_cycle": 8,
+              "name": "EX",
+              "start_cycle": 7
+            },
+            {
+              "end_cycle": 9,
+              "name": "WB",
+              "start_cycle": 8
+            },
+            {
+              "end_cycle": 16,
+              "name": "RR",
+              "start_cycle": 9
+            }
+          ]
+        }
+      },
+      "pc": 0,
+      "retired_cycle": 16,
+      "rid": 20
+    },
+    {
+      "fetched_cycle": 2,
+      "gid": 20,
+      "id": 20,
+      "label_name": "mov w0, #0",
+      "lanes": {
+        "main": {
+          "name": "main",
+          "stages": [
+            {
+              "end_cycle": 3,
+              "name": "IF",
+              "start_cycle": 2
+            },
+            {
+              "end_cycle": 4,
+              "name": "DE",
+              "start_cycle": 3
+            },
+            {
+              "end_cycle": 5,
+              "name": "RN",
+              "start_cycle": 4
+            },
+            {
+              "end_cycle": 6,
+              "name": "DI",
+              "start_cycle": 5
+            },
+            {
+              "end_cycle": 7,
+              "name": "IS",
+              "start_cycle": 6
+            },
+            {
+              "end_cycle": 8,
+              "name": "EX",
+              "start_cycle": 7
+            },
+            {
+              "end_cycle": 9,
+              "name": "WB",
+              "start_cycle": 8
+            },
+            {
+              "end_cycle": 16,
+              "name": "RR",
+              "start_cycle": 9
+            }
+          ]
+        }
+      },
+      "pc": 0,
+      "retired_cycle": 16,
+      "rid": 21
+    },
+    {
+      "fetched_cycle": 2,
+      "gid": 21,
+      "id": 21,
+      "label_name": "nop",
+      "lanes": {
+        "main": {
+          "name": "main",
+          "stages": [
+            {
+              "end_cycle": 3,
+              "name": "IF",
+              "start_cycle": 2
+            },
+            {
+              "end_cycle": 4,
+              "name": "DE",
+              "start_cycle": 3
+            },
+            {
+              "end_cycle": 5,
+              "name": "RN",
+              "start_cycle": 4
+            },
+            {
+              "end_cycle": 6,
+              "name": "DI",
+              "start_cycle": 5
+            },
+            {
+              "end_cycle": 7,
+              "name": "IS",
+              "start_cycle": 6
+            },
+            {
+              "end_cycle": 8,
+              "name": "EX",
+              "start_cycle": 7
+            },
+            {
+              "end_cycle": 9,
+              "name": "WB",
+              "start_cycle": 8
+            },
+            {
+              "end_cycle": 16,
+              "name": "RR",
+              "start_cycle": 9
+            }
+          ]
+        }
+      },
+      "pc": 0,
+      "retired_cycle": 16,
+      "rid": 22
+    },
+    {
+      "fetched_cycle": 2,
+      "gid": 22,
+      "id": 22,
+      "label_name": "nop",
+      "lanes": {
+        "main": {
+          "name": "main",
+          "stages": [
+            {
+              "end_cycle": 3,
+              "name": "IF",
+              "start_cycle": 2
+            },
+            {
+              "end_cycle": 4,
+              "name": "DE",
+              "start_cycle": 3
+            },
+            {
+              "end_cycle": 5,
+              "name": "RN",
+              "start_cycle": 4
+            },
+            {
+              "end_cycle": 6,
+              "name": "DI",
+              "start_cycle": 5
+            },
+            {
+              "end_cycle": 7,
+              "name": "IS",
+              "start_cycle": 6
+            },
+            {
+              "end_cycle": 8,
+              "name": "EX",
+              "start_cycle": 7
+            },
+            {
+              "end_cycle": 9,
+              "name": "WB",
+              "start_cycle": 8
+            },
+            {
+              "end_cycle": 17,
+              "name": "RR",
+              "start_cycle": 9
+            }
+          ]
+        }
+      },
+      "pc": 0,
+      "retired_cycle": 17,
+      "rid": 23
+    },
+    {
+      "fetched_cycle": 2,
+      "gid": 23,
+      "id": 23,
+      "label_name": "nop",
+      "lanes": {
+        "main": {
+          "name": "main",
+          "stages": [
+            {
+              "end_cycle": 3,
+              "name": "IF",
+              "start_cycle": 2
+            },
+            {
+              "end_cycle": 4,
+              "name": "DE",
+              "start_cycle": 3
+            },
+            {
+              "end_cycle": 5,
+              "name": "RN",
+              "start_cycle": 4
+            },
+            {
+              "end_cycle": 6,
+              "name": "DI",
+              "start_cycle": 5
+            },
+            {
+              "end_cycle": 7,
+              "name": "IS",
+              "start_cycle": 6
+            },
+            {
+              "end_cycle": 8,
+              "name": "EX",
+              "start_cycle": 7
+            },
+            {
+              "end_cycle": 9,
+              "name": "WB",
+              "start_cycle": 8
+            },
+            {
+              "end_cycle": 17,
+              "name": "RR",
+              "start_cycle": 9
+            }
+          ]
+        }
+      },
+      "pc": 0,
+      "retired_cycle": 17,
+      "rid": 24
+    },
+    {
+      "fetched_cycle": 3,
+      "gid": 24,
+      "id": 24,
+      "is_memory": true,
+      "label_name": "ldr w3, [x2], #4",
+      "lanes": {
+        "main": {
+          "name": "main",
+          "stages": [
+            {
+              "end_cycle": 4,
+              "name": "IF",
+              "start_cycle": 3
+            },
+            {
+              "end_cycle": 5,
+              "name": "DE",
+              "start_cycle": 4
+            },
+            {
+              "end_cycle": 6,
+              "name": "RN",
+              "start_cycle": 5
+            },
+            {
+              "end_cycle": 7,
+              "name": "DI",
+              "start_cycle": 6
+            },
+            {
+              "end_cycle": 13,
+              "name": "DI:7-12",
+              "start_cycle": 7
+            },
+            {
+              "end_cycle": 14,
+              "name": "IS",
+              "start_cycle": 13
+            },
+            {
+              "end_cycle": 17,
+              "name": "ME:L1",
+              "start_cycle": 14
+            },
+            {
+              "end_cycle": 18,
+              "name": "WB",
+              "start_cycle": 17
+            },
+            {
+              "end_cycle": 19,
+              "name": "RR",
+              "start_cycle": 18
+            }
+          ]
+        }
+      },
+      "mem_addr": 0,
+      "pc": 0,
+      "prods": [
+        {
+          "producer_id": 6,
+          "type": "memory"
+        }
+      ],
+      "retired_cycle": 17,
+      "rid": 25
+    },
+    {
+      "fetched_cycle": 3,
+      "gid": 25,
+      "id": 25,
+      "label_name": "add w0, w0, w3",
+      "lanes": {
+        "main": {
+          "name": "main",
+          "stages": [
+            {
+              "end_cycle": 4,
+              "name": "IF",
+              "start_cycle": 3
+            },
+            {
+              "end_cycle": 5,
+              "name": "DE",
+              "start_cycle": 4
+            },
+            {
+              "end_cycle": 6,
+              "name": "RN",
+              "start_cycle": 5
+            },
+            {
+              "end_cycle": 7,
+              "name": "DI",
+              "start_cycle": 6
+            },
+            {
+              "end_cycle": 8,
+              "name": "IS",
+              "start_cycle": 7
+            },
+            {
+              "end_cycle": 9,
+              "name": "EX",
+              "start_cycle": 8
+            },
+            {
+              "end_cycle": 10,
+              "name": "WB",
+              "start_cycle": 9
+            },
+            {
+              "end_cycle": 17,
+              "name": "RR",
+              "start_cycle": 10
+            }
+          ]
+        }
+      },
+      "pc": 0,
+      "retired_cycle": 17,
+      "rid": 26
+    },
+    {
+      "fetched_cycle": 3,
+      "gid": 26,
+      "id": 26,
+      "label_name": "cmp x2, x1",
+      "lanes": {
+        "main": {
+          "name": "main",
+          "stages": [
+            {
+              "end_cycle": 4,
+              "name": "IF",
+              "start_cycle": 3
+            },
+            {
+              "end_cycle": 5,
+              "name": "DE",
+              "start_cycle": 4
+            },
+            {
+              "end_cycle": 6,
+              "name": "RN",
+              "start_cycle": 5
+            },
+            {
+              "end_cycle": 7,
+              "name": "DI",
+              "start_cycle": 6
+            },
+            {
+              "end_cycle": 8,
+              "name": "IS",
+              "start_cycle": 7
+            },
+            {
+              "end_cycle": 9,
+              "name": "EX",
+              "start_cycle": 8
+            },
+            {
+              "end_cycle": 10,
+              "name": "WB",
+              "start_cycle": 9
+            },
+            {
+              "end_cycle": 18,
+              "name": "RR",
+              "start_cycle": 10
+            }
+          ]
+        }
+      },
+      "pc": 0,
+      "retired_cycle": 18,
+      "rid": 27
+    },
+    {
+      "fetched_cycle": 3,
+      "gid": 27,
+      "id": 27,
+      "label_name": "b.ne #0xff4",
+      "lanes": {
+        "main": {
+          "name": "main",
+          "stages": [
+            {
+              "end_cycle": 4,
+              "name": "IF",
+              "start_cycle": 3
+            },
+            {
+              "end_cycle": 5,
+              "name": "DE",
+              "start_cycle": 4
+            },
+            {
+              "end_cycle": 6,
+              "name": "RN",
+              "start_cycle": 5
+            },
+            {
+              "end_cycle": 7,
+              "name": "DI",
+              "start_cycle": 6
+            },
+            {
+              "end_cycle": 8,
+              "name": "IS",
+              "start_cycle": 7
+            },
+            {
+              "end_cycle": 9,
+              "name": "EX",
+              "start_cycle": 8
+            },
+            {
+              "end_cycle": 10,
+              "name": "WB",
+              "start_cycle": 9
+            },
+            {
+              "end_cycle": 18,
+              "name": "RR",
+              "start_cycle": 10
+            }
+          ]
+        }
+      },
+      "pc": 0,
+      "retired_cycle": 18,
+      "rid": 28
+    },
+    {
+      "fetched_cycle": 3,
+      "gid": 28,
+      "id": 28,
+      "label_name": "ret",
+      "lanes": {
+        "main": {
+          "name": "main",
+          "stages": [
+            {
+              "end_cycle": 4,
+              "name": "IF",
+              "start_cycle": 3
+            },
+            {
+              "end_cycle": 5,
+              "name": "DE",
+              "start_cycle": 4
+            },
+            {
+              "end_cycle": 6,
+              "name": "RN",
+              "start_cycle": 5
+            },
+            {
+              "end_cycle": 7,
+              "name": "DI",
+              "start_cycle": 6
+            },
+            {
+              "end_cycle": 8,
+              "name": "IS",
+              "start_cycle": 7
+            },
+            {
+              "end_cycle": 9,
+              "name": "EX",
+              "start_cycle": 8
+            },
+            {
+              "end_cycle": 10,
+              "name": "WB",
+              "start_cycle": 9
+            },
+            {
+              "end_cycle": 18,
+              "name": "RR",
+              "start_cycle": 10
+            }
+          ]
+        }
+      },
+      "pc": 0,
+      "retired_cycle": 18,
+      "rid": 29
+    },
+    {
+      "fetched_cycle": 3,
+      "gid": 29,
+      "id": 29,
+      "label_name": "mov w0, #0",
+      "lanes": {
+        "main": {
+          "name": "main",
+          "stages": [
+            {
+              "end_cycle": 4,
+              "name": "IF",
+              "start_cycle": 3
+            },
+            {
+              "end_cycle": 5,
+              "name": "DE",
+              "start_cycle": 4
+            },
+            {
+              "end_cycle": 6,
+              "name": "RN",
+              "start_cycle": 5
+            },
+            {
+              "end_cycle": 7,
+              "name": "DI",
+              "start_cycle": 6
+            },
+            {
+              "end_cycle": 8,
+              "name": "IS",
+              "start_cycle": 7
+            },
+            {
+              "end_cycle": 9,
+              "name": "EX",
+              "start_cycle": 8
+            },
+            {
+              "end_cycle": 10,
+              "name": "WB",
+              "start_cycle": 9
+            },
+            {
+              "end_cycle": 18,
+              "name": "RR",
+              "start_cycle": 10
+            }
+          ]
+        }
+      },
+      "pc": 0,
+      "retired_cycle": 18,
+      "rid": 30
+    },
+    {
+      "fetched_cycle": 3,
+      "gid": 30,
+      "id": 30,
+      "label_name": "ret",
+      "lanes": {
+        "main": {
+          "name": "main",
+          "stages": [
+            {
+              "end_cycle": 4,
+              "name": "IF",
+              "start_cycle": 3
+            },
+            {
+              "end_cycle": 5,
+              "name": "DE",
+              "start_cycle": 4
+            },
+            {
+              "end_cycle": 6,
+              "name": "RN",
+              "start_cycle": 5
+            },
+            {
+              "end_cycle": 7,
+              "name": "DI",
+              "start_cycle": 6
+            },
+            {
+              "end_cycle": 8,
+              "name": "IS",
+              "start_cycle": 7
+            },
+            {
+              "end_cycle": 9,
+              "name": "EX",
+              "start_cycle": 8
+            },
+            {
+              "end_cycle": 10,
+              "name": "WB",
+              "start_cycle": 9
+            },
+            {
+              "end_cycle": 19,
+              "name": "RR",
+              "start_cycle": 10
+            }
+          ]
+        }
+      },
+      "pc": 0,
+      "retired_cycle": 19,
+      "rid": 31
+    },
+    {
+      "fetched_cycle": 3,
+      "gid": 31,
+      "id": 31,
+      "label_name": "nop",
+      "lanes": {
+        "main": {
+          "name": "main",
+          "stages": [
+            {
+              "end_cycle": 4,
+              "name": "IF",
+              "start_cycle": 3
+            },
+            {
+              "end_cycle": 5,
+              "name": "DE",
+              "start_cycle": 4
+            },
+            {
+              "end_cycle": 6,
+              "name": "RN",
+              "start_cycle": 5
+            },
+            {
+              "end_cycle": 7,
+              "name": "DI",
+              "start_cycle": 6
+            },
+            {
+              "end_cycle": 8,
+              "name": "IS",
+              "start_cycle": 7
+            },
+            {
+              "end_cycle": 9,
+              "name": "EX",
+              "start_cycle": 8
+            },
+            {
+              "end_cycle": 10,
+              "name": "WB",
+              "start_cycle": 9
+            },
+            {
+              "end_cycle": 19,
+              "name": "RR",
+              "start_cycle": 10
+            }
+          ]
+        }
+      },
+      "pc": 0,
+      "retired_cycle": 19,
+      "rid": 32
+    },
+    {
+      "fetched_cycle": 4,
+      "gid": 32,
+      "id": 32,
+      "label_name": "cmp w1, #0",
+      "lanes": {
+        "main": {
+          "name": "main",
+          "stages": [
+            {
+              "end_cycle": 5,
+              "name": "IF",
+              "start_cycle": 4
+            },
+            {
+              "end_cycle": 6,
+              "name": "DE",
+              "start_cycle": 5
+            },
+            {
+              "end_cycle": 7,
+              "name": "RN",
+              "start_cycle": 6
+            },
+            {
+              "end_cycle": 8,
+              "name": "DI",
+              "start_cycle": 7
+            },
+            {
+              "end_cycle": 9,
+              "name": "IS",
+              "start_cycle": 8
+            },
+            {
+              "end_cycle": 10,
+              "name": "EX",
+              "start_cycle": 9
+            },
+            {
+              "end_cycle": 11,
+              "name": "WB",
+              "start_cycle": 10
+            },
+            {
+              "end_cycle": 19,
+              "name": "RR",
+              "start_cycle": 11
+            }
+          ]
+        }
+      },
+      "pc": 0,
+      "retired_cycle": 19,
+      "rid": 33
+    },
+    {
+      "fetched_cycle": 4,
+      "gid": 33,
+      "id": 33,
+      "label_name": "b.le #0x101c",
+      "lanes": {
+        "main": {
+          "name": "main",
+          "stages": [
+            {
+              "end_cycle": 5,
+              "name": "IF",
+              "start_cycle": 4
+            },
+            {
+              "end_cycle": 6,
+              "name": "DE",
+              "start_cycle": 5
+            },
+            {
+              "end_cycle": 7,
+              "name": "RN",
+              "start_cycle": 6
+            },
+            {
+              "end_cycle": 8,
+              "name": "DI",
+              "start_cycle": 7
+            },
+            {
+              "end_cycle": 9,
+              "name": "IS",
+              "start_cycle": 8
+            },
+            {
+              "end_cycle": 10,
+              "name": "EX",
+              "start_cycle": 9
+            },
+            {
+              "end_cycle": 11,
+              "name": "WB",
+              "start_cycle": 10
+            },
+            {
+              "end_cycle": 19,
+              "name": "RR",
+              "start_cycle": 11
+            }
+          ]
+        }
+      },
+      "pc": 0,
+      "retired_cycle": 19,
+      "rid": 34
+    },
+    {
+      "fetched_cycle": 4,
+      "gid": 34,
+      "id": 34,
+      "label_name": "sxtw x1, w1",
+      "lanes": {
+        "main": {
+          "name": "main",
+          "stages": [
+            {
+              "end_cycle": 5,
+              "name": "IF",
+              "start_cycle": 4
+            },
+            {
+              "end_cycle": 6,
+              "name": "DE",
+              "start_cycle": 5
+            },
+            {
+              "end_cycle": 7,
+              "name": "RN",
+              "start_cycle": 6
+            },
+            {
+              "end_cycle": 8,
+              "name": "DI",
+              "start_cycle": 7
+            },
+            {
+              "end_cycle": 9,
+              "name": "IS",
+              "start_cycle": 8
+            },
+            {
+              "end_cycle": 10,
+              "name": "EX",
+              "start_cycle": 9
+            },
+            {
+              "end_cycle": 11,
+              "name": "WB",
+              "start_cycle": 10
+            },
+            {
+              "end_cycle": 20,
+              "name": "RR",
+              "start_cycle": 11
+            }
+          ]
+        }
+      },
+      "pc": 0,
+      "retired_cycle": 20,
+      "rid": 35
+    },
+    {
+      "fetched_cycle": 4,
+      "gid": 35,
+      "id": 35,
+      "label_name": "mov x2, #0",
+      "lanes": {
+        "main": {
+          "name": "main",
+          "stages": [
+            {
+              "end_cycle": 5,
+              "name": "IF",
+              "start_cycle": 4
+            },
+            {
+              "end_cycle": 6,
+              "name": "DE",
+              "start_cycle": 5
+            },
+            {
+              "end_cycle": 7,
+              "name": "RN",
+              "start_cycle": 6
+            },
+            {
+              "end_cycle": 8,
+              "name": "DI",
+              "start_cycle": 7
+            },
+            {
+              "end_cycle": 9,
+              "name": "IS",
+              "start_cycle": 8
+            },
+            {
+              "end_cycle": 10,
+              "name": "EX",
+              "start_cycle": 9
+            },
+            {
+              "end_cycle": 11,
+              "name": "WB",
+              "start_cycle": 10
+            },
+            {
+              "end_cycle": 20,
+              "name": "RR",
+              "start_cycle": 11
+            }
+          ]
+        }
+      },
+      "pc": 0,
+      "retired_cycle": 20,
+      "rid": 36
+    },
+    {
+      "fetched_cycle": 4,
+      "gid": 36,
+      "id": 36,
+      "is_memory": true,
+      "label_name": "str w2, [x0, x2, lsl #2]",
+      "lanes": {
+        "main": {
+          "name": "main",
+          "stages": [
+            {
+              "end_cycle": 5,
+              "name": "IF",
+              "start_cycle": 4
+            },
+            {
+              "end_cycle": 6,
+              "name": "DE",
+              "start_cycle": 5
+            },
+            {
+              "end_cycle": 7,
+              "name": "RN",
+              "start_cycle": 6
+            },
+            {
+              "end_cycle": 8,
+              "name": "DI",
+              "start_cycle": 7
+            },
+            {
+              "end_cycle": 17,
+              "name": "DI:8-16",
+              "start_cycle": 8
+            },
+            {
+              "end_cycle": 18,
+              "name": "IS",
+              "start_cycle": 17
+            },
+            {
+              "end_cycle": 21,
+              "name": "ME:L1",
+              "start_cycle": 18
+            },
+            {
+              "end_cycle": 22,
+              "name": "WB",
+              "start_cycle": 21
+            },
+            {
+              "end_cycle": 23,
+              "name": "RR",
+              "start_cycle": 22
+            }
+          ]
+        }
+      },
+      "mem_addr": 0,
+      "pc": 0,
+      "prods": [
+        {
+          "producer_id": 24,
+          "type": "memory"
+        }
+      ],
+      "retired_cycle": 21,
+      "rid": 37
+    },
+    {
+      "fetched_cycle": 4,
+      "gid": 37,
+      "id": 37,
+      "label_name": "add x2, x2, #1",
+      "lanes": {
+        "main": {
+          "name": "main",
+          "stages": [
+            {
+              "end_cycle": 5,
+              "name": "IF",
+              "start_cycle": 4
+            },
+            {
+              "end_cycle": 6,
+              "name": "DE",
+              "start_cycle": 5
+            },
+            {
+              "end_cycle": 7,
+              "name": "RN",
+              "start_cycle": 6
+            },
+            {
+              "end_cycle": 8,
+              "name": "DI",
+              "start_cycle": 7
+            },
+            {
+              "end_cycle": 9,
+              "name": "IS",
+              "start_cycle": 8
+            },
+            {
+              "end_cycle": 10,
+              "name": "EX",
+              "start_cycle": 9
+            },
+            {
+              "end_cycle": 11,
+              "name": "WB",
+              "start_cycle": 10
+            },
+            {
+              "end_cycle": 21,
+              "name": "RR",
+              "start_cycle": 11
+            }
+          ]
+        }
+      },
+      "pc": 0,
+      "retired_cycle": 21,
+      "rid": 38
+    },
+    {
+      "fetched_cycle": 4,
+      "gid": 38,
+      "id": 38,
+      "label_name": "cmp x2, x1",
+      "lanes": {
+        "main": {
+          "name": "main",
+          "stages": [
+            {
+              "end_cycle": 5,
+              "name": "IF",
+              "start_cycle": 4
+            },
+            {
+              "end_cycle": 6,
+              "name": "DE",
+              "start_cycle": 5
+            },
+            {
+              "end_cycle": 7,
+              "name": "RN",
+              "start_cycle": 6
+            },
+            {
+              "end_cycle": 8,
+              "name": "DI",
+              "start_cycle": 7
+            },
+            {
+              "end_cycle": 9,
+              "name": "IS",
+              "start_cycle": 8
+            },
+            {
+              "end_cycle": 10,
+              "name": "EX",
+              "start_cycle": 9
+            },
+            {
+              "end_cycle": 11,
+              "name": "WB",
+              "start_cycle": 10
+            },
+            {
+              "end_cycle": 21,
+              "name": "RR",
+              "start_cycle": 11
+            }
+          ]
+        }
+      },
+      "pc": 0,
+      "retired_cycle": 21,
+      "rid": 39
+    },
+    {
+      "fetched_cycle": 4,
+      "gid": 39,
+      "id": 39,
+      "label_name": "b.ne #0xff4",
+      "lanes": {
+        "main": {
+          "name": "main",
+          "stages": [
+            {
+              "end_cycle": 5,
+              "name": "IF",
+              "start_cycle": 4
+            },
+            {
+              "end_cycle": 6,
+              "name": "DE",
+              "start_cycle": 5
+            },
+            {
+              "end_cycle": 7,
+              "name": "RN",
+              "start_cycle": 6
+            },
+            {
+              "end_cycle": 8,
+              "name": "DI",
+              "start_cycle": 7
+            },
+            {
+              "end_cycle": 9,
+              "name": "IS",
+              "start_cycle": 8
+            },
+            {
+              "end_cycle": 10,
+              "name": "EX",
+              "start_cycle": 9
+            },
+            {
+              "end_cycle": 11,
+              "name": "WB",
+              "start_cycle": 10
+            },
+            {
+              "end_cycle": 21,
+              "name": "RR",
+              "start_cycle": 11
+            }
+          ]
+        }
+      },
+      "pc": 0,
+      "retired_cycle": 21,
+      "rid": 40
+    },
+    {
+      "fetched_cycle": 5,
+      "gid": 40,
+      "id": 40,
+      "label_name": "ret",
+      "lanes": {
+        "main": {
+          "name": "main",
+          "stages": [
+            {
+              "end_cycle": 6,
+              "name": "IF",
+              "start_cycle": 5
+            },
+            {
+              "end_cycle": 7,
+              "name": "DE",
+              "start_cycle": 6
+            },
+            {
+              "end_cycle": 8,
+              "name": "RN",
+              "start_cycle": 7
+            },
+            {
+              "end_cycle": 9,
+              "name": "DI",
+              "start_cycle": 8
+            },
+            {
+              "end_cycle": 10,
+              "name": "IS",
+              "start_cycle": 9
+            },
+            {
+              "end_cycle": 11,
+              "name": "EX",
+              "start_cycle": 10
+            },
+            {
+              "end_cycle": 12,
+              "name": "WB",
+              "start_cycle": 11
+            },
+            {
+              "end_cycle": 22,
+              "name": "RR",
+              "start_cycle": 12
+            }
+          ]
+        }
+      },
+      "pc": 0,
+      "retired_cycle": 22,
+      "rid": 41
+    }
+  ],
+  "ops_count": 41,
+  "total_cycles": 23,
+  "total_instructions": 41,
+  "version": "1.0"
+}

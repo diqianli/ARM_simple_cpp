@@ -1,0 +1,42 @@
+# Branch prediction verification trace
+# Pattern: alternating taken/not-taken conditional branches
+# with unconditional branch at the end
+#
+# Layout:
+#   0x1000: ADD (compute)
+#   0x1004: ADD (compute)
+#   0x1008: CMP X0, #5
+#   0x100c: B.GT 0x1020  <- taken (X0=10 > 5)
+#   0x1010: SUB (skipped - wrong path)
+#   0x1014: SUB (skipped - wrong path)
+#   0x1018: B 0x1030     <- not reached
+#   0x1020: MUL (target of taken branch)
+#   0x1024: CMP X1, #100
+#   0x1028: B.GT 0x1038  <- NOT taken (X1=3 < 100)
+#   0x102c: AND (fall-through, executed)
+#   0x1030: ORR (target of not-taken, NOT reached)
+#   0x1034: NOP
+#   0x1038: EOR (target of not-taken, reached)
+#   0x103c: B 0x1044     <- unconditional, taken
+#   0x1040: NOP (skipped)
+#   0x1044: ADD (unconditional branch target)
+#   0x1048: RET
+
+0x1000 ADD X0, X1, X2
+0x1004 ADD X3, X4, X5
+0x1008 CMP X0, #5
+0x100c B.GT 0x1020
+0x1010 SUB X6, X7, X8
+0x1014 SUB X9, X10, X11
+0x1018 B 0x1030
+0x1020 MUL X12, X13, X14
+0x1024 CMP X1, #100
+0x1028 B.GT 0x1038
+0x102c AND X15, X16, X17
+0x1030 ORR X19, X20, X21
+0x1034 NOP
+0x1038 EOR X22, X23, X24
+0x103c B 0x1044
+0x1040 NOP
+0x1044 ADD X25, X26, X27
+0x1048 RET
