@@ -18,6 +18,7 @@
 #include <string>
 #include <string_view>
 #include <unordered_map>
+#include <unordered_set>
 
 struct cs_insn;
 
@@ -70,6 +71,9 @@ public:
 
 private:
     size_t handle_ = 0;  // csh handle (size_t in Capstone v5)
+
+    /// Mnemonics that fell through to OpcodeType::Other (for diagnostics).
+    mutable std::unordered_set<std::string> reported_undefined_;
 
     static const MnemonicLookup lookup_;
 

@@ -1,9 +1,13 @@
 /// @file elf_trace.cpp
 /// @brief Implementation of the ELF trace parser.
+///
+/// Uses FunctionalSim to perform a PC-based dynamic trace generation
+/// with perfect branch prediction, instead of linearly scanning all
+/// executable segments.
 
 #include "arm_cpu/input/elf_trace.hpp"
 #include "arm_cpu/elf/elf_loader.hpp"
-#include "arm_cpu/decoder/capstone_decoder.hpp"
+#include "arm_cpu/input/functional_sim.hpp"
 
 #include <cstring>
 
@@ -29,51 +33,20 @@ Result<ElfTraceParser> ElfTraceParser::from_file(const std::string& path) {
             std::to_string(elf.header().machine) + ")"));
     }
 
-    // Step 2: Initialize Capstone
-    decoder::CapstoneDecoder capstone;
-    if (!capstone.init()) {
-        return Err(EmulatorError::trace_parse("Capstone initialization failed"));
+    // Step 2: Run functional simulation to generate dynamic trace
+    // This performs PC-based execution with perfect branch prediction.
+    FunctionalSim::Config sim_config;
+    auto trace_result = FunctionalSim::run(elf, sim_config);
+    if (trace_result.has_error()) {
+        return Err(EmulatorError::trace_parse(
+            "Functional simulation failed: " + trace_result.error().message()));
     }
-
-    // Step 3: Decode instructions from executable segments
-    auto exe_segments = elf.executable_segments();
-    std::vector<Instruction> instructions;
-
-    for (const auto* seg : exe_segments) {
-        if (!seg || seg->size < 4) continue;
-
-        for (std::size_t offset = 0; offset + 4 <= seg->size; offset += 4) {
-            uint64_t pc = seg->vaddr + offset;
-            // Byte-by-byte read to avoid alignment/aliasing issues
-            const uint8_t* p = seg->data.data() + offset;
-            uint32_t raw = static_cast<uint32_t>(p[0])
-                         | (static_cast<uint32_t>(p[1]) << 8)
-                         | (static_cast<uint32_t>(p[2]) << 16)
-                         | (static_cast<uint32_t>(p[3]) << 24);
-
-            auto decoded = capstone.decode(pc, raw);
-            auto instr = decoded.to_instruction(InstructionId(instructions.size()));
-            instructions.push_back(std::move(instr));
-        }
-    }
+    auto instructions = std::move(trace_result.value());
 
     if (instructions.empty()) {
         return Err(EmulatorError::trace_parse(
-            "No instructions found in ELF executable segments"));
-    }
-
-    // Step 4: Replace trailing infinite-loop branches with NOPs so simulation
-    // can terminate. Scan backwards for unconditional backward branches.
-    for (int i = static_cast<int>(instructions.size()) - 1; i >= 0; --i) {
-        auto& instr = instructions[i];
-        if (instr.branch_info.has_value() && !instr.branch_info->is_conditional) {
-            uint64_t target = instr.branch_info->target;
-            if (target <= instr.pc) {
-                instr.opcode_type = OpcodeType::Nop;
-                instr.branch_info = std::nullopt;
-                break;
-            }
-        }
+            "No instructions executed from entry point 0x" +
+            std::to_string(elf.entry_point())));
     }
 
     return Ok(ElfTraceParser(std::move(instructions), path));

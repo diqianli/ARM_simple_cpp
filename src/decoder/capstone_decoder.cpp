@@ -785,6 +785,16 @@ DecodedInstruction CapstoneDecoder::decode(uint64_t pc, uint32_t raw) const {
         result.branch_info = BranchInfo{is_cond, target, true};
     }
 
+    // Report unmapped mnemonics to stderr for diagnostics
+    if (result.opcode == OpcodeType::Other) {
+        reported_undefined_.emplace(insn->mnemonic);
+        if (reported_undefined_.size() <= 10) {
+            std::fprintf(stderr,
+                "Warning: Unmapped mnemonic \"%s\" at PC=0x%llx (raw=0x%08x)\n",
+                insn->mnemonic, (unsigned long long)pc, (unsigned)raw);
+        }
+    }
+
     // Extract register operands
     extract_operands(insn, result);
 
