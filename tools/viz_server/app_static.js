@@ -104,9 +104,23 @@ class StaticVisualization {
                 throw new Error(`HTTP ${response.status}: ${response.statusText}`);
             }
 
-            const data = await response.json();
-            this.handleData(data);
-            this.updateStatus(`Loaded ${this.defaultDataFile} successfully`);
+            const contentLength = response.headers.get('content-length');
+            if (contentLength && parseInt(contentLength) > 5 * 1024 * 1024) {
+                // Large file: use streaming text extraction
+                this.updateStatus(`Large file detected, extracting first 500 ops...`);
+                const text = await response.text();
+                const data = this.extractOpsFromText(text, 500);
+                if (data) {
+                    this.handleData(data);
+                    this.updateStatus(`Loaded 500 ops from ${this.defaultDataFile} (truncated)`);
+                } else {
+                    throw new Error('Failed to extract ops from large file');
+                }
+            } else {
+                const data = await response.json();
+                this.handleData(data);
+                this.updateStatus(`Loaded ${this.defaultDataFile} successfully`);
+            }
         } catch (error) {
             console.warn('Could not load default file:', error.message);
             // On file:// protocol, fetch fails due to CORS.
@@ -115,6 +129,53 @@ class StaticVisualization {
             const demoData = this.getInlineDemoData();
             this.handleData(demoData);
             this.updateStatus('Loaded built-in demo data (12 instructions). Use "Load JSON File" to load custom data.');
+        }
+    }
+
+    /**
+     * Extract first N ops from a JSON text string without full JSON.parse.
+     * Avoids stack overflow on large single-line JSON files.
+     */
+    extractOpsFromText(text, maxOps) {
+        const opsStart = text.indexOf('"ops"');
+        if (opsStart === -1) return null;
+        const arrStart = text.indexOf('[', opsStart);
+        if (arrStart === -1) return null;
+
+        let metadata = {};
+        try {
+            const prefix = text.substring(0, opsStart).replace(/,\s*$/, '');
+            const partial = JSON.parse(prefix + ',"ops":[]}');
+            metadata = partial;
+            delete partial.ops;
+        } catch (_) {}
+
+        let depth = 0, count = 0, i = arrStart + 1;
+        const opsText = ['['];
+        for (; i < text.length && count < maxOps; i++) {
+            const ch = text[i];
+            opsText.push(ch);
+            if (ch === '{') depth++;
+            else if (ch === '}') {
+                depth--;
+                if (depth === 0) {
+                    count++;
+                    if (count < maxOps) opsText.push(',');
+                }
+            }
+        }
+        opsText.push(']');
+
+        try {
+            const fullJSON = '{"ops":' + opsText.join('') +
+                ',"ops_count":' + count +
+                ',"total_cycles":' + (metadata.total_cycles || 0) +
+                ',"total_instructions":' + (metadata.total_instructions || 0) +
+                ',"version":"1.0"}';
+            return JSON.parse(fullJSON);
+        } catch (e) {
+            console.error('Failed to parse extracted ops:', e);
+            return null;
         }
     }
 
@@ -190,21 +251,78 @@ class StaticVisualization {
     loadFile(file) {
         this.updateStatus(`Loading ${file.name}...`);
 
+        // For small files (< 5MB), use standard JSON.parse
+        if (file.size < 5 * 1024 * 1024) {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                try {
+                    const data = JSON.parse(e.target.result);
+                    this.handleData(data);
+                    this.updateStatus(`Loaded ${file.name} successfully`);
+                } catch (error) {
+                    console.error('Failed to parse JSON:', error);
+                    this.updateStatus(`Error: Failed to parse JSON - ${error.message}`);
+                }
+            };
+            reader.onerror = () => { this.updateStatus('Error reading file'); };
+            reader.readAsText(file);
+            return;
+        }
+
+        // For large files, stream-extract first N ops to avoid stack overflow
+        this.updateStatus(`Large file (${(file.size / 1024 / 1024).toFixed(1)} MB), extracting first 500 ops...`);
+        const MAX_OPS = 500;
+        const slice = file.slice(0, 10 * 1024 * 1024); // read first 10MB
         const reader = new FileReader();
         reader.onload = (e) => {
             try {
-                const data = JSON.parse(e.target.result);
+                const text = e.target.result;
+                const opsStart = text.indexOf('"ops"');
+                if (opsStart === -1) { this.updateStatus('Error: cannot find ops array in JSON'); return; }
+                const arrStart = text.indexOf('[', opsStart);
+                if (arrStart === -1) { this.updateStatus('Error: cannot find ops array start'); return; }
+
+                // Extract metadata from prefix
+                let metadata = {};
+                try {
+                    const prefix = text.substring(0, opsStart).replace(/,\s*$/, '');
+                    const partial = JSON.parse(prefix + ',"ops":[]}');
+                    metadata = partial;
+                    delete partial.ops;
+                } catch (_) {}
+
+                // Count braces to extract N ops
+                let depth = 0, count = 0, i = arrStart + 1;
+                const opsText = ['['];
+                for (; i < text.length && count < MAX_OPS; i++) {
+                    const ch = text[i];
+                    opsText.push(ch);
+                    if (ch === '{') depth++;
+                    else if (ch === '}') {
+                        depth--;
+                        if (depth === 0) {
+                            count++;
+                            if (count < MAX_OPS) opsText.push(',');
+                        }
+                    }
+                }
+                opsText.push(']');
+
+                const fullJSON = '{"ops":' + opsText.join('') +
+                    ',"ops_count":' + count +
+                    ',"total_cycles":' + (metadata.total_cycles || 0) +
+                    ',"total_instructions":' + (metadata.total_instructions || 0) +
+                    ',"version":"1.0"}';
+                const data = JSON.parse(fullJSON);
                 this.handleData(data);
-                this.updateStatus(`Loaded ${file.name} successfully`);
+                this.updateStatus(`Loaded ${count} ops from ${file.name} (truncated from full dataset)`);
             } catch (error) {
-                console.error('Failed to parse JSON:', error);
-                this.updateStatus(`Error: Failed to parse JSON - ${error.message}`);
+                console.error('Failed to parse large file:', error);
+                this.updateStatus(`Error: Failed to parse large file - ${error.message}`);
             }
         };
-        reader.onerror = () => {
-            this.updateStatus('Error reading file');
-        };
-        reader.readAsText(file);
+        reader.onerror = () => { this.updateStatus('Error reading file'); };
+        reader.readAsText(slice);
     }
 
     handleData(data) {
