@@ -655,6 +655,10 @@ Result<ElfLoader> ElfLoader::parse(std::span<const uint8_t> data) {
     // Parse symbols
     auto symtab = TRY(parse_symbols(data, shdrs));
 
+    // Parse PLT symbols (dynamic linking support)
+    bool is_dynamic = false;
+    auto plt_syms = parse_plt_symbols(data, shdrs, is_dynamic);
+
     std::vector<uint8_t> data_copy(data.begin(), data.end());
 
     return ElfLoader(
@@ -663,7 +667,9 @@ Result<ElfLoader> ElfLoader::parse(std::span<const uint8_t> data) {
         std::move(phdrs),
         std::move(shdrs),
         std::move(segments),
-        std::move(symtab)
+        std::move(symtab),
+        std::move(plt_syms),
+        is_dynamic
     );
 }
 
@@ -862,13 +868,17 @@ ElfLoader::ElfLoader(std::vector<uint8_t> data, ElfHeader header,
                      std::vector<ProgramHeader> phdrs,
                      std::vector<SectionHeader> shdrs,
                      std::vector<MemorySegment> segments,
-                     SymbolTable symbols)
+                     SymbolTable symbols,
+                     std::unordered_map<uint64_t, std::string> plt_symbols,
+                     bool is_dynamic)
     : data_(std::move(data))
     , header_(std::move(header))
     , program_headers_(std::move(phdrs))
     , section_headers_(std::move(shdrs))
     , segments_(std::move(segments))
     , symbols_(std::move(symbols))
+    , plt_symbols_(std::move(plt_symbols))
+    , is_dynamic_(is_dynamic)
 {}
 
 uint64_t ElfLoader::entry_point() const {
@@ -952,6 +962,119 @@ std::optional<DecodedInstruction> ElfLoader::decode_at(uint64_t addr) const {
     auto raw = read_instruction(addr);
     if (!raw) return {};
     return Arm64Decoder::decode(addr, *raw);
+}
+
+bool ElfLoader::is_dynamic() const {
+    return is_dynamic_;
+}
+
+std::optional<std::string_view> ElfLoader::get_plt_symbol(uint64_t addr) const {
+    auto it = plt_symbols_.find(addr);
+    if (it != plt_symbols_.end()) {
+        return it->second;
+    }
+    return {};
+}
+
+const std::unordered_map<uint64_t, std::string>& ElfLoader::plt_symbols() const {
+    return plt_symbols_;
+}
+
+std::unordered_map<uint64_t, std::string> ElfLoader::parse_plt_symbols(
+    std::span<const uint8_t> data, const std::vector<SectionHeader>& shdrs,
+    bool& out_is_dynamic)
+{
+    std::unordered_map<uint64_t, std::string> result;
+    out_is_dynamic = false;
+
+    // Section type constants
+    constexpr uint32_t SHT_DYNSYM = 11;
+    constexpr uint32_t SHT_RELA   = 4;
+
+    // Find relevant sections
+    const SectionHeader* dynsym_sec = nullptr;
+    const SectionHeader* dynstr_sec = nullptr;
+    const SectionHeader* plt_sec    = nullptr;
+    const SectionHeader* rela_plt_sec = nullptr;
+
+    for (const auto& sh : shdrs) {
+        if (sh.sh_type == SHT_DYNSYM) {
+            dynsym_sec = &sh;
+            out_is_dynamic = true;
+        }
+        if (sh.sh_type == SHT_RELA && sh.name && sh.name->find("plt") != std::string::npos) {
+            rela_plt_sec = &sh;
+        }
+        if (sh.name) {
+            if (*sh.name == ".dynstr") dynstr_sec = &sh;
+            if (*sh.name == ".plt")    plt_sec = &sh;
+        }
+    }
+
+    // Also check program headers for PT_INTERP
+    // (done by caller — but we set out_is_dynamic from .dynsym presence)
+
+    if (!dynsym_sec || !dynstr_sec || !rela_plt_sec) {
+        return result;
+    }
+
+    std::size_t dynsym_offset = static_cast<std::size_t>(dynsym_sec->sh_offset);
+    std::size_t dynstr_offset = static_cast<std::size_t>(dynstr_sec->sh_offset);
+    std::size_t dynstr_size   = static_cast<std::size_t>(dynstr_sec->sh_size);
+
+    // If we have a .plt section, map PLT stub addresses
+    // PLT layout on ARM64: PLT0 is 32 bytes, each subsequent entry is 16 bytes
+    uint64_t plt_base = 0;
+    bool use_plt_addrs = false;
+    if (plt_sec && plt_sec->sh_addr != 0) {
+        plt_base = plt_sec->sh_addr;
+        use_plt_addrs = true;
+    }
+
+    // Each .rela.plt entry is 24 bytes: r_offset(8), r_info(8), r_addend(8)
+    std::size_t rela_offset = static_cast<std::size_t>(rela_plt_sec->sh_offset);
+    std::size_t rela_size   = static_cast<std::size_t>(rela_plt_sec->sh_size);
+    std::size_t num_rela    = rela_size / 24;
+
+    for (std::size_t i = 0; i < num_rela; ++i) {
+        std::size_t off = rela_offset + i * 24;
+        if (off + 24 > data.size()) break;
+
+        uint64_t r_offset = read_le<uint64_t>(data, off);
+        uint64_t r_info   = read_le<uint64_t>(data, off + 8);
+
+        // Symbol index is upper 32 bits of r_info
+        uint32_t sym_idx = static_cast<uint32_t>(r_info >> 32);
+
+        // Look up symbol name from .dynsym
+        std::size_t sym_off = dynsym_offset + static_cast<std::size_t>(sym_idx) * 24;
+        if (sym_off + 24 > data.size()) continue;
+
+        uint32_t st_name = read_le<uint32_t>(data, sym_off);
+        std::size_t name_start = dynstr_offset + static_cast<std::size_t>(st_name);
+        std::size_t str_end = dynstr_offset + dynstr_size;
+        if (name_start >= data.size() || name_start >= str_end) continue;
+
+        auto remaining = data.subspan(name_start, str_end - name_start);
+        auto null_pos = static_cast<std::size_t>(
+            std::distance(remaining.begin(), std::find(remaining.begin(), remaining.end(), 0)));
+        if (null_pos == 0) null_pos = remaining.size();
+
+        std::string name(reinterpret_cast<const char*>(remaining.data()), null_pos);
+        if (name.empty()) continue;
+
+        // Map PLT stub address -> symbol name
+        if (use_plt_addrs) {
+            // PLT entry i (0-indexed) starts at plt_base + 32 + i * 16
+            uint64_t plt_addr = plt_base + 32 + static_cast<uint64_t>(i) * 16;
+            result[plt_addr] = std::move(name);
+        }
+
+        // Also map by GOT address (for BLR/BR indirect calls through GOT)
+        result[r_offset] = name;
+    }
+
+    return result;
 }
 
 } // namespace arm_cpu

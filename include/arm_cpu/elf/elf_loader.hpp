@@ -286,18 +286,32 @@ public:
     /// Decode an instruction at the given address using the ARM64 decoder
     std::optional<DecodedInstruction> decode_at(uint64_t addr) const;
 
+    /// Check if ELF is dynamically linked (has .dynsym or PT_INTERP)
+    bool is_dynamic() const;
+
+    /// Get PLT symbol name at address (e.g., 0x400510 -> "printf")
+    std::optional<std::string_view> get_plt_symbol(uint64_t addr) const;
+
+    /// Get all PLT symbols (PLT stub address -> symbol name)
+    const std::unordered_map<uint64_t, std::string>& plt_symbols() const;
+
 private:
     ElfLoader(std::vector<uint8_t> data, ElfHeader header,
               std::vector<ProgramHeader> phdrs,
               std::vector<SectionHeader> shdrs,
               std::vector<MemorySegment> segments,
-              SymbolTable symbols);
+              SymbolTable symbols,
+              std::unordered_map<uint64_t, std::string> plt_symbols,
+              bool is_dynamic);
 
     static Result<ElfHeader> parse_elf_header(std::span<const uint8_t> data);
     static Result<std::vector<ProgramHeader>> parse_program_headers(std::span<const uint8_t> data, const ElfHeader& header);
     static Result<std::vector<SectionHeader>> parse_section_headers(std::span<const uint8_t> data, const ElfHeader& header);
     static Result<std::vector<MemorySegment>> load_segments(std::span<const uint8_t> data, const std::vector<ProgramHeader>& phdrs);
     static Result<SymbolTable> parse_symbols(std::span<const uint8_t> data, const std::vector<SectionHeader>& shdrs);
+    static std::unordered_map<uint64_t, std::string> parse_plt_symbols(
+        std::span<const uint8_t> data, const std::vector<SectionHeader>& shdrs,
+        bool& out_is_dynamic);
 
     std::vector<uint8_t> data_;
     ElfHeader header_;
@@ -305,6 +319,8 @@ private:
     std::vector<SectionHeader> section_headers_;
     std::vector<MemorySegment> segments_;
     SymbolTable symbols_;
+    std::unordered_map<uint64_t, std::string> plt_symbols_;  // PLT stub addr -> symbol name
+    bool is_dynamic_ = false;
 };
 
 } // namespace arm_cpu

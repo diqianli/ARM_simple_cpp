@@ -162,6 +162,13 @@ else
     record "elf_sim" "SKIP" "cross-compiled ELF not available (run scripts/compile_test_elf.sh)"
 fi
 
+# Dynamic ELF simulation (requires aarch64-linux-gnu-gcc with glibc sysroot)
+if [ -f "$SIM_BIN" ] && [ -f "$DATA_DIR/dynamic_test_aarch64" ]; then
+    run_cmd "elf_sim_dynamic" "$SIM_BIN" -f elf "$DATA_DIR/dynamic_test_aarch64" -n 200 -c 500000
+else
+    record "elf_sim_dynamic" "SKIP" "dynamic test ELF not available (needs aarch64-linux-gnu-gcc)"
+fi
+
 # =====================================================================
 # 5. MULTI-CONFIG
 # =====================================================================

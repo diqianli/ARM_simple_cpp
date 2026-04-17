@@ -66,6 +66,10 @@ FunctionalSim::FunctionalSim(const ElfLoader& elf, Config config)
             memory_[seg.vaddr + i] = seg.data[i];
         }
     }
+
+    // PLT interception for dynamic ELF
+    plt_symbols_ = &elf_.plt_symbols();
+    is_dynamic_ = elf_.is_dynamic();
 }
 
 // =====================================================================
@@ -158,6 +162,12 @@ bool FunctionalSim::step() {
     }
 
     cs_free(insn, count);
+
+    // Check if a stub requested simulation stop (exit/abort)
+    if (stop_simulation_) {
+        return false;
+    }
+
     return true;
 }
 
@@ -176,8 +186,9 @@ unsigned FunctionalSim::gpr_index(unsigned reg_id) const {
 }
 
 bool FunctionalSim::is_32bit_op(unsigned reg_id) const {
-    return (reg_id >= ARM64_REG_W0 && reg_id <= ARM64_REG_WZR) ||
-           reg_id == ARM64_REG_WSP;
+    return (reg_id >= ARM64_REG_W0 && reg_id <= ARM64_REG_W30) ||
+           reg_id == ARM64_REG_WSP ||
+           reg_id == ARM64_REG_WZR;
 }
 
 uint64_t FunctionalSim::read_gpr(unsigned reg_id) const {
@@ -333,8 +344,26 @@ uint64_t FunctionalSim::compute_mem_addr(const cs_insn* insn, int op_index,
             if (i != op_index && arch.operands[i].type == ARM64_OP_REG &&
                 arch.operands[i].reg == op.mem.index) {
                 auto shifter = arch.operands[i].shift;
-                if (shifter.type == ARM64_SFT_LSL && shifter.value > 0) {
-                    index_val <<= shifter.value;
+                switch (shifter.type) {
+                    case ARM64_SFT_LSL:
+                        index_val <<= shifter.value;
+                        break;
+                    case ARM64_EXT_SXTW:
+                        index_val = static_cast<uint64_t>(
+                            static_cast<int64_t>(static_cast<int32_t>(
+                                static_cast<uint32_t>(index_val)))) << shifter.value;
+                        break;
+                    case ARM64_EXT_UXTW:
+                        index_val = (index_val & 0xFFFFFFFFULL) << shifter.value;
+                        break;
+                    case ARM64_EXT_SXTX:
+                        index_val = static_cast<int64_t>(index_val) << shifter.value;
+                        break;
+                    case ARM64_EXT_UXTX:
+                        index_val <<= shifter.value;
+                        break;
+                    default:
+                        break;
                 }
                 break;
             }
@@ -480,6 +509,14 @@ bool FunctionalSim::execute(const cs_insn* insn) {
 
     if (std::strcmp(mnem, "bl") == 0) {
         uint64_t target = static_cast<uint64_t>(get_imm(0));
+
+        // PLT interception for dynamic ELF
+        if (is_plt_call(target)) {
+            auto it = plt_symbols_->find(target);
+            std::string name = (it != plt_symbols_->end()) ? it->second : "unknown";
+            return handle_external_call(pc_ + 4, name);
+        }
+
         write_gpr(ARM64_REG_LR, pc_ + 4);  // set link register
         call_stack_.push_back(pc_ + 4);
         pc_ = target;
@@ -544,6 +581,14 @@ bool FunctionalSim::execute(const cs_insn* insn) {
     // BR (unconditional branch to register)
     if (std::strcmp(mnem, "br") == 0) {
         uint64_t target = get_reg_val(0);
+
+        // PLT interception for dynamic ELF (indirect call through GOT)
+        if (is_plt_call(target)) {
+            auto it = plt_symbols_->find(target);
+            std::string name = (it != plt_symbols_->end()) ? it->second : "unknown";
+            return handle_external_call(pc_ + 4, name);
+        }
+
         pc_ = target;
         return true;
     }
@@ -551,6 +596,15 @@ bool FunctionalSim::execute(const cs_insn* insn) {
     // BLR (branch with link to register)
     if (std::strcmp(mnem, "blr") == 0) {
         uint64_t target = get_reg_val(0);
+
+        // PLT interception for dynamic ELF (indirect call through GOT)
+        if (is_plt_call(target)) {
+            write_gpr(ARM64_REG_LR, pc_ + 4);
+            auto it = plt_symbols_->find(target);
+            std::string name = (it != plt_symbols_->end()) ? it->second : "unknown";
+            return handle_external_call(pc_ + 4, name);
+        }
+
         write_gpr(ARM64_REG_LR, pc_ + 4);
         call_stack_.push_back(pc_ + 4);
         pc_ = target;
@@ -621,7 +675,13 @@ bool FunctionalSim::execute(const cs_insn* insn) {
         uint64_t a = get_reg_val(1);
         uint64_t b;
         if (arch.operands[2].type == ARM64_OP_REG) {
-            b = apply_shift(get_reg_val(2), 2);
+            // Check if this is an extended register (e.g., add x0, x1, w2, sxtw #2)
+            auto sft = arch.operands[2].shift;
+            if (sft.type >= ARM64_EXT_UXTW && sft.type <= ARM64_EXT_SXTX) {
+                b = apply_extend(get_reg_val(2), 2);
+            } else {
+                b = apply_shift(get_reg_val(2), 2);
+            }
         } else if (arch.operands[2].type == ARM64_OP_IMM) {
             b = static_cast<uint64_t>(arch.operands[2].imm);
         } else {
@@ -649,7 +709,12 @@ bool FunctionalSim::execute(const cs_insn* insn) {
         uint64_t a = get_reg_val(1);
         uint64_t b;
         if (arch.operands[2].type == ARM64_OP_REG) {
-            b = apply_shift(get_reg_val(2), 2);
+            auto sft = arch.operands[2].shift;
+            if (sft.type >= ARM64_EXT_UXTW && sft.type <= ARM64_EXT_SXTX) {
+                b = apply_extend(get_reg_val(2), 2);
+            } else {
+                b = apply_shift(get_reg_val(2), 2);
+            }
         } else if (arch.operands[2].type == ARM64_OP_IMM) {
             b = static_cast<uint64_t>(arch.operands[2].imm);
         } else {
@@ -1519,6 +1584,612 @@ bool FunctionalSim::execute(const cs_insn* insn) {
     // (These don't affect integer branch conditions in most programs)
     // ================================================================
     return false;
+}
+
+// =====================================================================
+// PLT interception — dynamic linking support
+// =====================================================================
+
+bool FunctionalSim::is_plt_call(uint64_t target) const {
+    if (!plt_symbols_ || plt_symbols_->empty()) return false;
+    return plt_symbols_->find(target) != plt_symbols_->end();
+}
+
+// Helper: read a null-terminated string from simulator memory
+static std::string read_cstring(const std::unordered_map<uint64_t, uint8_t>& mem, uint64_t addr) {
+    std::string result;
+    while (true) {
+        auto it = mem.find(addr);
+        if (it == mem.end() || it->second == 0) break;
+        result += static_cast<char>(it->second);
+        addr++;
+        if (result.size() > 4096) break;  // safety limit
+    }
+    return result;
+}
+
+bool FunctionalSim::handle_external_call(uint64_t lr_save, const std::string& name) {
+    // __libc_start_main: X0=main, X1=argc, X2=argv
+    // Jump to main() directly, set LR so main's return goes to abort@plt
+    if (name == "__libc_start_main" || name == "__libc_start_main_impl") {
+        uint64_t main_addr = read_gpr(ARM64_REG_X0);
+        uint64_t argc_val = read_gpr(ARM64_REG_X1);
+        uint64_t argv_val = read_gpr(ARM64_REG_X2);
+        // main(int argc, char *argv[]) expects: X0=argc, X1=argv
+        // Default argc to 1 if stack was empty (no kernel setup)
+        if (argc_val == 0 || argc_val > 1000) argc_val = 1;
+        if (argv_val == 0) {
+            // Create a minimal argv: argv[0] = NULL
+            uint64_t argv_addr = sp_ - 16;
+            mem_write64(argv_addr, 0);  // argv[0] = NULL
+            argv_val = argv_addr;
+        }
+        write_gpr(ARM64_REG_X0, argc_val);
+        write_gpr(ARM64_REG_X1, argv_val);
+        write_gpr(ARM64_REG_LR, lr_save);  // main's return -> _start's abort call
+        call_stack_.push_back(lr_save);
+        pc_ = main_addr;
+        return true;
+    }
+
+    // printf family
+    if (name == "printf" || name == "fprintf" || name == "sprintf" || name == "snprintf") {
+        stub_printf(name);
+        pc_ = lr_save;
+        return true;
+    }
+    if (name == "__printf_chk" || name == "__fprintf_chk" || name == "__sprintf_chk" || name == "__snprintf_chk") {
+        // __printf_chk(flag, fmt, ...) — same as printf but X0=flag (ignored), X1=format
+        stub_printf(name);
+        pc_ = lr_save;
+        return true;
+    }
+    if (name == "puts") {
+        stub_puts();
+        pc_ = lr_save;
+        return true;
+    }
+    if (name == "putchar") {
+        uint64_t ch = read_gpr(ARM64_REG_X0);
+        std::fprintf(stderr, "%c", (int)ch);
+        write_gpr(ARM64_REG_X0, ch);
+        pc_ = lr_save;
+        return true;
+    }
+    if (name == "malloc") {
+        stub_malloc();
+        pc_ = lr_save;
+        return true;
+    }
+    if (name == "calloc") {
+        stub_calloc();
+        pc_ = lr_save;
+        return true;
+    }
+    if (name == "realloc") {
+        // Simple: just return the old pointer (no actual realloc)
+        uint64_t old_ptr = read_gpr(ARM64_REG_X0);
+        write_gpr(ARM64_REG_X0, old_ptr);
+        pc_ = lr_save;
+        return true;
+    }
+    if (name == "free") {
+        // no-op
+        pc_ = lr_save;
+        return true;
+    }
+    if (name == "strlen") {
+        stub_strlen();
+        pc_ = lr_save;
+        return true;
+    }
+    if (name == "strcpy" || name == "__strcpy_chk") {
+        stub_strcpy(false);
+        pc_ = lr_save;
+        return true;
+    }
+    if (name == "strncpy" || name == "__strncpy_chk") {
+        stub_strcpy(true);
+        pc_ = lr_save;
+        return true;
+    }
+    if (name == "strcat" || name == "__strcat_chk") {
+        // __strcat_chk(dst, src, flag) — flag ignored
+        // strcat(dst, src): X0=dst, X1=src
+        // Same register layout for both
+        uint64_t dst = read_gpr(ARM64_REG_X0);
+        uint64_t src = read_gpr(ARM64_REG_X1);
+        // Find end of dst
+        uint64_t end = dst;
+        while (true) {
+            auto it = memory_.find(end);
+            if (it == memory_.end() || it->second == 0) break;
+            end++;
+        }
+        // Copy src
+        uint64_t si = 0;
+        while (true) {
+            auto it = memory_.find(src + si);
+            uint8_t ch = (it != memory_.end()) ? it->second : 0;
+            memory_[end + si] = ch;
+            si++;
+            if (ch == 0) break;
+        }
+        write_gpr(ARM64_REG_X0, dst);
+        pc_ = lr_save;
+        return true;
+    }
+    if (name == "strncat" || name == "__strncat_chk") {
+        // __strncat_chk(dst, src, n, flag) — flag ignored
+        // strncat(dst, src, n): X0=dst, X1=src, X2=n
+        uint64_t dst = read_gpr(ARM64_REG_X0);
+        uint64_t src = read_gpr(ARM64_REG_X1);
+        uint64_t n = read_gpr(ARM64_REG_X2);
+        uint64_t end = dst;
+        while (true) {
+            auto it = memory_.find(end);
+            if (it == memory_.end() || it->second == 0) break;
+            end++;
+        }
+        uint64_t si = 0;
+        while (si < n) {
+            auto it = memory_.find(src + si);
+            uint8_t ch = (it != memory_.end()) ? it->second : 0;
+            memory_[end + si] = ch;
+            si++;
+            if (ch == 0) break;
+        }
+        if (si == n) memory_[end + si] = 0;
+        write_gpr(ARM64_REG_X0, dst);
+        pc_ = lr_save;
+        return true;
+    }
+    if (name == "strcmp") {
+        stub_strcmp(false);
+        pc_ = lr_save;
+        return true;
+    }
+    if (name == "strncmp") {
+        stub_strcmp(true);
+        pc_ = lr_save;
+        return true;
+    }
+    if (name == "memcpy" || name == "memmove" || name == "__memcpy_chk" || name == "__memmove_chk") {
+        stub_memcpy();
+        pc_ = lr_save;
+        return true;
+    }
+    if (name == "memset" || name == "__memset_chk") {
+        stub_memset();
+        pc_ = lr_save;
+        return true;
+    }
+    if (name == "write") {
+        stub_write();
+        pc_ = lr_save;
+        return true;
+    }
+    if (name == "exit" || name == "_exit" || name == "_Exit") {
+        stop_simulation_ = true;
+        write_gpr(ARM64_REG_X0, 0);
+        pc_ = lr_save;
+        return true;
+    }
+    if (name == "abort") {
+        std::fprintf(stderr, "FunctionalSim: abort() called\n");
+        stop_simulation_ = true;
+        pc_ = lr_save;
+        return true;
+    }
+    if (name == "atoi" || name == "atol") {
+        auto s = read_cstring(memory_, read_gpr(ARM64_REG_X0));
+        write_gpr(ARM64_REG_X0, static_cast<uint64_t>(std::atol(s.c_str())));
+        pc_ = lr_save;
+        return true;
+    }
+    if (name == "strtoul" || name == "strtol") {
+        write_gpr(ARM64_REG_X0, 0);
+        pc_ = lr_save;
+        return true;
+    }
+    if (name == "mmap") {
+        // Return a fake mapped page
+        static uint64_t mmap_ptr = 0xB0000000ULL;
+        uint64_t len = read_gpr(ARM64_REG_X1);
+        write_gpr(ARM64_REG_X0, mmap_ptr);
+        mmap_ptr += (len + 4095) & ~4095ULL;
+        pc_ = lr_save;
+        return true;
+    }
+    if (name == "munmap") {
+        write_gpr(ARM64_REG_X0, 0);  // success
+        pc_ = lr_save;
+        return true;
+    }
+    if (name == "mprotect") {
+        write_gpr(ARM64_REG_X0, 0);  // success
+        pc_ = lr_save;
+        return true;
+    }
+    if (name == "brk") {
+        uint64_t new_brk = read_gpr(ARM64_REG_X0);
+        static uint64_t brk_val = 0xC0000000ULL;
+        if (new_brk != 0) {
+            brk_val = new_brk;
+        }
+        write_gpr(ARM64_REG_X0, brk_val);
+        pc_ = lr_save;
+        return true;
+    }
+    if (name == "sbrk") {
+        static uint64_t sbrk_val = 0xC0000000ULL;
+        int64_t incr = static_cast<int64_t>(read_gpr(ARM64_REG_X0));
+        uint64_t old = sbrk_val;
+        sbrk_val += static_cast<uint64_t>(incr);
+        write_gpr(ARM64_REG_X0, old);
+        pc_ = lr_save;
+        return true;
+    }
+    if (name == "setjmp" || name == "_setjmp") {
+        // Just return 0 (direct return, no longjmp support)
+        write_gpr(ARM64_REG_X0, 0);
+        pc_ = lr_save;
+        return true;
+    }
+    if (name == "longjmp" || name == "_longjmp") {
+        // Cannot properly support — stop
+        std::fprintf(stderr, "FunctionalSim: longjmp() not supported\n");
+        stop_simulation_ = true;
+        pc_ = lr_save;
+        return true;
+    }
+    if (name == "signal" || name == "sigaction") {
+        write_gpr(ARM64_REG_X0, 0);  // success
+        pc_ = lr_save;
+        return true;
+    }
+    if (name == "__stack_chk_fail") {
+        std::fprintf(stderr, "FunctionalSim: stack canary check failed\n");
+        stop_simulation_ = true;
+        pc_ = lr_save;
+        return true;
+    }
+    if (name == "__cxa_atexit" || name == "__cxa_finalize") {
+        write_gpr(ARM64_REG_X0, 0);
+        pc_ = lr_save;
+        return true;
+    }
+    if (name == "__errno_location" || name == "__libc_errno") {
+        static uint64_t errno_addr = 0xC0001000ULL;
+        write_gpr(ARM64_REG_X0, errno_addr);
+        pc_ = lr_save;
+        return true;
+    }
+    if (name == "dlopen" || name == "dlsym" || name == "dlclose") {
+        write_gpr(ARM64_REG_X0, 0);
+        pc_ = lr_save;
+        return true;
+    }
+    if (name == "getenv") {
+        write_gpr(ARM64_REG_X0, 0);  // not found
+        pc_ = lr_save;
+        return true;
+    }
+    if (name == "clock_gettime" || name == "gettimeofday") {
+        // Zero-fill the struct
+        uint64_t buf = read_gpr(ARM64_REG_X1);
+        if (name == "clock_gettime") {
+            buf = read_gpr(ARM64_REG_X1);
+        }
+        for (int i = 0; i < 16; i++) {
+            memory_[buf + i] = 0;
+        }
+        write_gpr(ARM64_REG_X0, 0);
+        pc_ = lr_save;
+        return true;
+    }
+
+    // Unknown function — warn and return 0
+    std::fprintf(stderr, "FunctionalSim: unstubbed external call: %s\n", name.c_str());
+    write_gpr(ARM64_REG_X0, 0);
+    pc_ = lr_save;
+    return true;
+}
+
+void FunctionalSim::stub_printf(const std::string& variant) {
+    // For fprintf: X0=FILE*, X1=format
+    // For sprintf/snprintf: X0=buf, X1/X2=format
+    // For printf: X0=format
+    // For __printf_chk: X0=flag, X1=format
+    // For __fprintf_chk: X0=flag, X1=FILE*, X2=format
+    // For __sprintf_chk: X0=flag, X1=buf, X2=format
+    // For __snprintf_chk: X0=flag, X1=buf, X2=size, X3=format
+    uint64_t fmt_addr = read_gpr(ARM64_REG_X0);
+    if (variant == "fprintf" || variant == "sprintf" || variant == "snprintf") {
+        fmt_addr = read_gpr(ARM64_REG_X1);
+    } else if (variant == "__printf_chk") {
+        fmt_addr = read_gpr(ARM64_REG_X1);
+    } else if (variant == "__fprintf_chk") {
+        fmt_addr = read_gpr(ARM64_REG_X2);
+    } else if (variant == "__sprintf_chk") {
+        fmt_addr = read_gpr(ARM64_REG_X2);
+    } else if (variant == "__snprintf_chk") {
+        fmt_addr = read_gpr(ARM64_REG_X3);
+    }
+
+    auto fmt = read_cstring(memory_, fmt_addr);
+
+    // Determine which register format args start from
+    // printf: X0=fmt, args in X1..X7
+    // __printf_chk: X0=flag, X1=fmt, args in X2..X7
+    unsigned arg_start_reg = ARM64_REG_X1;
+    if (variant == "__printf_chk") {
+        arg_start_reg = ARM64_REG_X2;
+    } else if (variant == "__fprintf_chk") {
+        arg_start_reg = ARM64_REG_X3;
+    } else if (variant == "__sprintf_chk") {
+        arg_start_reg = ARM64_REG_X3;
+    } else if (variant == "__snprintf_chk") {
+        arg_start_reg = ARM64_REG_X4;
+    }
+
+    // Format args are passed in registers, rest on stack
+    uint64_t stack_args[8];
+    for (int i = 0; i < 8; i++) {
+        stack_args[i] = read_gpr(arg_start_reg + i);
+    }
+
+    int arg_idx = 0;
+    int total_chars = 0;
+
+    for (std::size_t i = 0; i < fmt.size(); ++i) {
+        if (fmt[i] != '%') {
+            std::fprintf(stderr, "%c", fmt[i]);
+            total_chars++;
+            continue;
+        }
+
+        // Parse format specifier
+        i++;
+        if (i >= fmt.size()) break;
+
+        // Handle %%
+        if (fmt[i] == '%') {
+            std::fprintf(stderr, "%%");
+            total_chars++;
+            continue;
+        }
+
+        // Skip flags, width, precision
+        while (i < fmt.size() && (fmt[i] == '-' || fmt[i] == '+' || fmt[i] == ' ' ||
+               fmt[i] == '#' || fmt[i] == '0' || fmt[i] == '*' ||
+               (fmt[i] >= '1' && fmt[i] <= '9') || fmt[i] == '.')) {
+            i++;
+        }
+        if (i >= fmt.size()) break;
+
+        // Length modifier
+        bool is_long = false;
+        bool is_longlong = false;
+        if (fmt[i] == 'l') {
+            is_long = true;
+            i++;
+            if (i < fmt.size() && fmt[i] == 'l') {
+                is_longlong = true;
+                i++;
+            }
+        } else if (fmt[i] == 'h') {
+            i++;
+            if (i < fmt.size() && fmt[i] == 'h') i++;
+        } else if (fmt[i] == 'z') {
+            i++;
+            is_long = true;
+        }
+        if (i >= fmt.size()) break;
+
+        char spec = fmt[i];
+
+        if (spec == 'd' || spec == 'i') {
+            int64_t val;
+            if (arg_idx < 8) {
+                if (!is_long && !is_longlong) {
+                    // %d without l/ll: argument is int (32-bit signed)
+                    val = static_cast<int32_t>(static_cast<uint32_t>(stack_args[arg_idx]));
+                } else {
+                    val = static_cast<int64_t>(stack_args[arg_idx]);
+                }
+            } else {
+                val = 0;
+            }
+            std::fprintf(stderr, "%lld", (long long)val);
+            total_chars += (int)std::snprintf(nullptr, 0, "%lld", (long long)val);
+            arg_idx++;
+        } else if (spec == 'u') {
+            uint64_t val;
+            if (arg_idx < 8) {
+                val = (!is_long && !is_longlong)
+                    ? static_cast<uint32_t>(stack_args[arg_idx])
+                    : stack_args[arg_idx];
+            } else {
+                val = 0;
+            }
+            std::fprintf(stderr, "%llu", (unsigned long long)val);
+            total_chars += (int)std::snprintf(nullptr, 0, "%llu", (unsigned long long)val);
+            arg_idx++;
+        } else if (spec == 'x') {
+            uint64_t val = (arg_idx < 8) ? stack_args[arg_idx] : 0;
+            std::fprintf(stderr, "%llx", (unsigned long long)val);
+            total_chars += (int)std::snprintf(nullptr, 0, "%llx", (unsigned long long)val);
+            arg_idx++;
+        } else if (spec == 'X') {
+            uint64_t val = (arg_idx < 8) ? stack_args[arg_idx] : 0;
+            std::fprintf(stderr, "%llX", (unsigned long long)val);
+            total_chars += (int)std::snprintf(nullptr, 0, "%llX", (unsigned long long)val);
+            arg_idx++;
+        } else if (spec == 'p') {
+            uint64_t val = (arg_idx < 8) ? stack_args[arg_idx] : 0;
+            std::fprintf(stderr, "0x%llx", (unsigned long long)val);
+            total_chars += (int)std::snprintf(nullptr, 0, "0x%llx", (unsigned long long)val);
+            arg_idx++;
+        } else if (spec == 'c') {
+            int ch = (arg_idx < 8) ? (int)stack_args[arg_idx] : 0;
+            std::fprintf(stderr, "%c", ch);
+            total_chars++;
+            arg_idx++;
+        } else if (spec == 's') {
+            uint64_t str_addr = (arg_idx < 8) ? stack_args[arg_idx] : 0;
+            auto s = read_cstring(memory_, str_addr);
+            std::fprintf(stderr, "%s", s.c_str());
+            total_chars += (int)s.size();
+            arg_idx++;
+        } else if (spec == 'f' || spec == 'e' || spec == 'g') {
+            // Floating point — read from X registers (we don't model FP regs well)
+            double val = 0.0;
+            std::fprintf(stderr, "%f", val);
+            total_chars += (int)std::snprintf(nullptr, 0, "%f", val);
+            arg_idx++;
+        } else if (spec == 'n') {
+            // %n — write chars written so far to *int
+            if (arg_idx < 8) {
+                uint64_t ptr = stack_args[arg_idx];
+                mem_write32(ptr, static_cast<uint32_t>(total_chars));
+            }
+            arg_idx++;
+        } else {
+            std::fprintf(stderr, "%%%c", spec);
+            total_chars += 2;
+        }
+    }
+
+    // For sprintf/snprintf, also write the result to the buffer
+    if (variant == "sprintf" || variant == "snprintf") {
+        uint64_t buf = read_gpr(ARM64_REG_X0);
+        auto fmt_str = read_cstring(memory_, fmt_addr);
+        // Write the formatted string to memory
+        for (std::size_t i = 0; i < fmt_str.size(); ++i) {
+            memory_[buf + i] = static_cast<uint8_t>(fmt_str[i]);
+        }
+        memory_[buf + fmt_str.size()] = 0;
+    }
+
+    write_gpr(ARM64_REG_X0, static_cast<uint64_t>(total_chars));
+}
+
+void FunctionalSim::stub_puts() {
+    uint64_t str_addr = read_gpr(ARM64_REG_X0);
+    auto s = read_cstring(memory_, str_addr);
+    std::fprintf(stderr, "%s\n", s.c_str());
+    write_gpr(ARM64_REG_X0, static_cast<uint64_t>(s.size() + 1));  // puts returns non-negative
+}
+
+void FunctionalSim::stub_malloc() {
+    uint64_t size = read_gpr(ARM64_REG_X0);
+    uint64_t aligned = (size + 15) & ~15ULL;  // 16-byte alignment
+    if (size == 0) aligned = 16;
+    write_gpr(ARM64_REG_X0, heap_ptr_);
+    heap_ptr_ += aligned;
+}
+
+void FunctionalSim::stub_calloc() {
+    uint64_t count = read_gpr(ARM64_REG_X0);
+    uint64_t size = read_gpr(ARM64_REG_X1);
+    uint64_t total = count * size;
+    uint64_t aligned = (total + 15) & ~15ULL;
+    if (total == 0) aligned = 16;
+    write_gpr(ARM64_REG_X0, heap_ptr_);
+    // Zero-fill
+    for (uint64_t i = 0; i < aligned; ++i) {
+        memory_[heap_ptr_ + i] = 0;
+    }
+    heap_ptr_ += aligned;
+}
+
+void FunctionalSim::stub_strlen() {
+    uint64_t str_addr = read_gpr(ARM64_REG_X0);
+    auto s = read_cstring(memory_, str_addr);
+    write_gpr(ARM64_REG_X0, s.size());
+}
+
+void FunctionalSim::stub_strcpy(bool is_strncpy) {
+    uint64_t dst = read_gpr(ARM64_REG_X0);
+    uint64_t src = read_gpr(ARM64_REG_X1);
+    uint64_t n = is_strncpy ? read_gpr(ARM64_REG_X2) : UINT64_MAX;
+
+    uint64_t i = 0;
+    while (i < n) {
+        auto it = memory_.find(src + i);
+        uint8_t ch = (it != memory_.end()) ? it->second : 0;
+        memory_[dst + i] = ch;
+        i++;
+        if (ch == 0) break;
+    }
+    // strncpy zero-pads if no null found
+    if (is_strncpy && i < n) {
+        for (; i < n; ++i) {
+            memory_[dst + i] = 0;
+        }
+    }
+    write_gpr(ARM64_REG_X0, dst);
+}
+
+void FunctionalSim::stub_strcmp(bool is_strncmp) {
+    uint64_t s1 = read_gpr(ARM64_REG_X0);
+    uint64_t s2 = read_gpr(ARM64_REG_X1);
+    uint64_t n = is_strncmp ? read_gpr(ARM64_REG_X2) : UINT64_MAX;
+
+    for (uint64_t i = 0; i < n; ++i) {
+        uint8_t c1 = 0, c2 = 0;
+        auto it1 = memory_.find(s1 + i);
+        if (it1 != memory_.end()) c1 = it1->second;
+        auto it2 = memory_.find(s2 + i);
+        if (it2 != memory_.end()) c2 = it2->second;
+        if (c1 != c2) {
+            write_gpr(ARM64_REG_X0, static_cast<uint64_t>(static_cast<int64_t>(c1) - static_cast<int64_t>(c2)));
+            return;
+        }
+        if (c1 == 0) break;
+    }
+    write_gpr(ARM64_REG_X0, 0);
+}
+
+void FunctionalSim::stub_memcpy() {
+    uint64_t dst = read_gpr(ARM64_REG_X0);
+    uint64_t src = read_gpr(ARM64_REG_X1);
+    uint64_t n = read_gpr(ARM64_REG_X2);
+
+    for (uint64_t i = 0; i < n; ++i) {
+        auto it = memory_.find(src + i);
+        uint8_t ch = (it != memory_.end()) ? it->second : 0;
+        memory_[dst + i] = ch;
+    }
+    write_gpr(ARM64_REG_X0, dst);
+}
+
+void FunctionalSim::stub_memset() {
+    uint64_t dst = read_gpr(ARM64_REG_X0);
+    uint64_t val = read_gpr(ARM64_REG_X1) & 0xFF;
+    uint64_t n = read_gpr(ARM64_REG_X2);
+
+    for (uint64_t i = 0; i < n; ++i) {
+        memory_[dst + i] = static_cast<uint8_t>(val);
+    }
+    write_gpr(ARM64_REG_X0, dst);
+}
+
+void FunctionalSim::stub_write() {
+    uint64_t fd = read_gpr(ARM64_REG_X0);
+    uint64_t buf = read_gpr(ARM64_REG_X1);
+    uint64_t count = read_gpr(ARM64_REG_X2);
+
+    // Only output for fd=1 (stdout) or fd=2 (stderr)
+    if (fd == 1 || fd == 2) {
+        for (uint64_t i = 0; i < count; ++i) {
+            auto it = memory_.find(buf + i);
+            uint8_t ch = (it != memory_.end()) ? it->second : 0;
+            std::fprintf(stderr, "%c", ch);
+        }
+    }
+    write_gpr(ARM64_REG_X0, count);
 }
 
 } // namespace arm_cpu

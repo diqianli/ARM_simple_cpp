@@ -89,6 +89,20 @@ private:
     // --- Instruction execution (returns true if PC was updated by branch) ---
     bool execute(const cs_insn* insn);
 
+    // --- PLT interception (dynamic linking support) ---
+    bool is_plt_call(uint64_t target) const;
+    bool handle_external_call(uint64_t lr_save, const std::string& func_name);
+    void stub_printf(const std::string& variant);
+    void stub_puts();
+    void stub_malloc();
+    void stub_calloc();
+    void stub_strlen();
+    void stub_strcpy(bool is_strncpy);
+    void stub_strcmp(bool is_strncmp);
+    void stub_memcpy();
+    void stub_memset();
+    void stub_write();
+
     // --- Addressing mode helpers ---
     uint64_t compute_mem_addr(const cs_insn* insn, int op_index,
                               uint64_t* writeback_val, bool* has_writeback);
@@ -117,6 +131,17 @@ private:
 
     // CapstoneDecoder for creating Instruction objects
     std::unique_ptr<decoder::CapstoneDecoder> decoder_;
+
+    // PLT interception (dynamic linking)
+    const std::unordered_map<uint64_t, std::string>* plt_symbols_ = nullptr;
+    bool is_dynamic_ = false;
+
+    // Heap bump allocator for malloc/calloc stubs
+    static constexpr uint64_t kHeapStart = 0xA0000000ULL;
+    uint64_t heap_ptr_ = kHeapStart;
+
+    // Signal from external call stubs to stop simulation
+    bool stop_simulation_ = false;
 };
 
 } // namespace arm_cpu

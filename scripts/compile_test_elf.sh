@@ -42,3 +42,14 @@ $CROSS -static -O2 -nostdlib -o "$OUT_FILE" "$SRC_FILE"
 
 echo "编译成功: $OUT_FILE"
 file "$OUT_FILE"
+
+# Also compile a dynamically linked variant if using a linux-gnu cross compiler
+if [[ "$CROSS" == *"-linux-gnu-gcc"* ]]; then
+    DYN_SRC="$SCRIPT_DIR/../tests/data/dynamic_test_source.c"
+    DYN_OUT="$OUT_DIR/dynamic_test_aarch64"
+    if [ -f "$DYN_SRC" ]; then
+        $CROSS -O2 -o "$DYN_OUT" "$DYN_SRC"
+        echo "编译成功 (dynamic): $DYN_OUT"
+        file "$DYN_OUT"
+    fi
+fi
