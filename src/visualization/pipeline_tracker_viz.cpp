@@ -37,13 +37,25 @@ std::vector<KonataStage> StageTimingViz::to_stages() const {
     if (dispatch_start && dispatch_end)
         add_stage_sequential("DI", *dispatch_start, *dispatch_end);
 
+    bool has_exec_stage = (memory_start && memory_end) || (execute_start && execute_end);
+
     if (issue_start && issue_end) {
         // Annotate DI waiting gap if there's a delay between DI end and IS start
         if (*issue_start > last_end) {
             std::string di_with_wait = std::format("DI:{}-{}", last_end, *issue_start - 1);
             add_stage_sequential(di_with_wait, last_end, *issue_start);
         }
-        add_stage_sequential("IS", *issue_start, *issue_end);
+
+        if (has_exec_stage) {
+            // When an EX/ME stage follows, IS is a point event at the issue cycle.
+            // Place IS at max(issue_start, last_end) to avoid overlapping with DI/gap,
+            // and set last_end so EX starts at the same cycle as IS.
+            uint64_t is_start = std::max(*issue_start, last_end);
+            stages.push_back(KonataStage::create("IS", is_start, is_start + 1));
+            last_end = is_start;
+        } else {
+            add_stage_sequential("IS", *issue_start, *issue_end);
+        }
     }
 
     if (memory_start && memory_end) {
