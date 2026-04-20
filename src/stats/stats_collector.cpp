@@ -414,6 +414,134 @@ void StatsCollector::record_l1_eviction() { stats_.l1_stats.add_eviction(); }
 void StatsCollector::record_l2_access(bool hit) { stats_.l2_stats.add_access(hit); }
 void StatsCollector::record_l2_eviction() { stats_.l2_stats.add_eviction(); }
 
+void StatsCollector::record_l1_read(bool hit, uint64_t latency) {
+    cache_detail_.l1_reads++;
+    if (!hit) {
+        cache_detail_.l1_read_misses++;
+        if (latency > 0) {
+            l1_miss_latency_total_ += latency;
+            l1_miss_count_++;
+            double n = static_cast<double>(l1_miss_count_);
+            cache_detail_.l1_avg_miss_latency = cache_detail_.l1_avg_miss_latency * (n - 1.0) / n + static_cast<double>(latency) / n;
+        }
+    }
+}
+
+void StatsCollector::record_l1_write(bool hit, uint64_t latency) {
+    cache_detail_.l1_writes++;
+    if (!hit) {
+        cache_detail_.l1_write_misses++;
+        if (latency > 0) {
+            l1_miss_latency_total_ += latency;
+            l1_miss_count_++;
+            double n = static_cast<double>(l1_miss_count_);
+            cache_detail_.l1_avg_miss_latency = cache_detail_.l1_avg_miss_latency * (n - 1.0) / n + static_cast<double>(latency) / n;
+        }
+    }
+}
+
+void StatsCollector::record_l2_read(bool hit, uint64_t latency) {
+    cache_detail_.l2_reads++;
+    if (!hit) {
+        cache_detail_.l2_read_misses++;
+        if (latency > 0) {
+            l2_miss_latency_total_ += latency;
+            l2_miss_count_++;
+            double n = static_cast<double>(l2_miss_count_);
+            cache_detail_.l2_avg_miss_latency = cache_detail_.l2_avg_miss_latency * (n - 1.0) / n + static_cast<double>(latency) / n;
+        }
+    }
+}
+
+void StatsCollector::record_l2_write(bool hit, uint64_t latency) {
+    cache_detail_.l2_writes++;
+    if (!hit) {
+        cache_detail_.l2_write_misses++;
+        if (latency > 0) {
+            l2_miss_latency_total_ += latency;
+            l2_miss_count_++;
+            double n = static_cast<double>(l2_miss_count_);
+            cache_detail_.l2_avg_miss_latency = cache_detail_.l2_avg_miss_latency * (n - 1.0) / n + static_cast<double>(latency) / n;
+        }
+    }
+}
+
+void StatsCollector::record_l1_writeback() { cache_detail_.l1_writebacks++; }
+void StatsCollector::record_l2_writeback() { cache_detail_.l2_writebacks++; }
+
+void StatsCollector::record_branch(bool taken, bool predicted_taken, bool btb_hit, bool ras_hit) {
+    branch_stats_.branches++;
+    if (taken) branch_stats_.taken++;
+    else branch_stats_.not_taken++;
+
+    if (taken == predicted_taken) {
+        branch_stats_.correct_predictions++;
+    } else {
+        branch_stats_.mispredictions++;
+        branch_stats_.squashes++;
+    }
+    if (btb_hit) branch_stats_.btb_hits++;
+    else branch_stats_.btb_misses++;
+    if (ras_hit) branch_stats_.ras_hits++;
+    else branch_stats_.ras_misses++;
+}
+
+void StatsCollector::record_fu_issued(OpcodeType opcode_type, uint64_t latency) {
+    if (is_branch(opcode_type)) {
+        fu_stats_.branch_cycles += latency;
+        fu_stats_.branch_issued++;
+    } else if (is_memory_op(opcode_type)) {
+        if (is_store_op(opcode_type)) {
+            fu_stats_.store_cycles += latency;
+            fu_stats_.store_issued++;
+        } else {
+            fu_stats_.load_cycles += latency;
+            fu_stats_.load_issued++;
+        }
+    } else if (is_simd(opcode_type) || opcode_type == OpcodeType::Fadd ||
+               opcode_type == OpcodeType::Fsub || opcode_type == OpcodeType::Fmul ||
+               opcode_type == OpcodeType::Fdiv || opcode_type == OpcodeType::Fmadd ||
+               opcode_type == OpcodeType::Fmsub || opcode_type == OpcodeType::Fnmadd ||
+               opcode_type == OpcodeType::Fnmsub || opcode_type == OpcodeType::Fcvt ||
+               opcode_type == OpcodeType::Mul || opcode_type == OpcodeType::Div) {
+        if (opcode_type == OpcodeType::Mul || opcode_type == OpcodeType::Div) {
+            fu_stats_.int_mul_cycles += latency;
+        } else {
+            fu_stats_.fp_simd_cycles += latency;
+        }
+        fu_stats_.fp_simd_issued++;
+    } else {
+        fu_stats_.int_alu_cycles += latency;
+        fu_stats_.int_alu_issued++;
+    }
+}
+
+void StatsCollector::record_stall_rob_full() {
+    stall_stats_.rob_full_stalls++;
+    stall_stats_.total_stall_cycles++;
+}
+void StatsCollector::record_stall_iq_full() {
+    stall_stats_.iq_full_stalls++;
+    stall_stats_.total_stall_cycles++;
+}
+void StatsCollector::record_stall_lsq_full() {
+    stall_stats_.lsq_full_stalls++;
+    stall_stats_.total_stall_cycles++;
+}
+void StatsCollector::record_stall_cache_miss() {
+    stall_stats_.cache_miss_stalls++;
+    stall_stats_.total_stall_cycles++;
+}
+void StatsCollector::record_stall_branch_mispredict() {
+    stall_stats_.branch_mispredict_stalls++;
+    stall_stats_.total_stall_cycles++;
+}
+
+void StatsCollector::record_issue_width(uint32_t issued) {
+    uint32_t bucket = std::min(issued, 4u);
+    stall_stats_.issue_width_dist[bucket]++;
+}
+
 void StatsCollector::record_load(uint64_t bytes, uint64_t latency) {
     stats_.memory_stats.record_load(bytes, latency);
 }
@@ -478,6 +606,13 @@ PerformanceMetrics StatsCollector::get_metrics() const {
     m.avg_load_latency = stats_.memory_stats.avg_load_latency;
     m.avg_store_latency = stats_.memory_stats.avg_store_latency;
     m.instr_by_type = stats_.instr_by_type;
+    m.branch_stats = branch_stats_;
+    m.fu_stats = fu_stats_;
+    m.fu_stats.total_available_cycles = stats_.total_cycles;
+    m.stall_stats = stall_stats_;
+    m.cache_detail = cache_detail_;
+    m.cache_detail.l1_evictions = stats_.l1_stats.evictions;
+    m.cache_detail.l2_evictions = stats_.l2_stats.evictions;
     return m;
 }
 
@@ -486,6 +621,14 @@ void StatsCollector::reset() {
     latencies_.clear();
     instr_timing_.clear();
     ipc_history_.clear();
+    branch_stats_ = BranchPredictorMetrics{};
+    fu_stats_ = FUUtilization{};
+    stall_stats_ = PipelineStallMetrics{};
+    cache_detail_ = DetailedCacheMetrics{};
+    l1_miss_latency_total_ = 0;
+    l1_miss_count_ = 0;
+    l2_miss_latency_total_ = 0;
+    l2_miss_count_ = 0;
 }
 
 } // namespace arm_cpu

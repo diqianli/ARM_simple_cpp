@@ -1,0 +1,878 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ARM CPU Emulator — Performance Profiling Dashboard</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg: #0d1117;
+    --surface: #161b22;
+    --border: #30363d;
+    --text: #e6edf3;
+    --text-dim: #8b949e;
+    --blue: #58a6ff;
+    --blue-bg: rgba(88,166,255,0.15);
+    --pink: #f97583;
+    --pink-bg: rgba(249,117,131,0.15);
+    --green: #3fb950;
+    --green-bg: rgba(63,185,80,0.15);
+    --orange: #d29922;
+    --orange-bg: rgba(210,153,34,0.15);
+    --purple: #bc8cff;
+    --purple-bg: rgba(188,140,255,0.15);
+    --cyan: #56d4dd;
+    --cyan-bg: rgba(86,212,221,0.15);
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+    padding: 24px;
+  }
+  .container { max-width: 1280px; margin: 0 auto; }
+
+  header { margin-bottom: 28px; }
+  header h1 {
+    font-size: 1.6rem;
+    font-weight: 600;
+    letter-spacing: -0.3px;
+    margin-bottom: 4px;
+  }
+  header h1 span.title { color: var(--blue); }
+  header p { color: var(--text-dim); font-size: 0.85rem; }
+
+  /* Summary cards */
+  .cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 16px;
+    margin-bottom: 28px;
+  }
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 18px 22px;
+  }
+  .card .label {
+    font-size: 0.78rem;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 6px;
+  }
+  .card .value {
+    font-size: 1.8rem;
+    font-weight: 700;
+  }
+  .card .sub {
+    font-size: 0.75rem;
+    color: var(--text-dim);
+    margin-top: 2px;
+  }
+  .card.c-ipc .value { color: var(--blue); }
+  .card.c-mispred .value { color: var(--orange); }
+  .card.c-miss .value { color: var(--pink); }
+  .card.c-stall .value { color: var(--purple); }
+
+  /* Charts grid */
+  .charts {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    margin-bottom: 28px;
+  }
+  .charts.full { grid-template-columns: 1fr; }
+  @media (max-width: 860px) {
+    .charts { grid-template-columns: 1fr; }
+  }
+  .chart-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 20px;
+  }
+  .chart-card h3 {
+    font-size: 0.9rem;
+    font-weight: 500;
+    margin-bottom: 14px;
+    color: var(--text);
+  }
+  .chart-card canvas { width: 100% !important; }
+
+  /* Table */
+  .table-wrap {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow-x: auto;
+    margin-bottom: 28px;
+  }
+  .table-wrap h3 {
+    font-size: 0.9rem;
+    font-weight: 500;
+    padding: 16px 20px 0;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 12px;
+    font-size: 0.82rem;
+  }
+  thead th {
+    text-align: left;
+    padding: 10px 14px;
+    font-weight: 600;
+    color: var(--text-dim);
+    border-bottom: 1px solid var(--border);
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    white-space: nowrap;
+  }
+  tbody td {
+    padding: 9px 14px;
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+  }
+  tbody tr:last-child td { border-bottom: none; }
+  tbody tr:hover { background: rgba(88,166,255,0.04); }
+  .bname { font-weight: 600; }
+  .good { color: var(--green); }
+  .warn { color: var(--orange); }
+  .bad { color: var(--pink); }
+  .dim { color: var(--text-dim); }
+
+  footer {
+    text-align: center;
+    color: var(--text-dim);
+    font-size: 0.75rem;
+    padding: 12px 0;
+  }
+
+  /* Benchmark selector */
+  .bench-tabs {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-bottom: 20px;
+  }
+  .bench-tab {
+    padding: 6px 14px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text-dim);
+    font-size: 0.8rem;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .bench-tab:hover { border-color: var(--blue); color: var(--text); }
+  .bench-tab.active { background: var(--blue-bg); border-color: var(--blue); color: var(--blue); font-weight: 600; }
+</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <h1><span class="title">ARM CPU Emulator</span> — GEM5-style Performance Profiling</h1>
+    <p>Out-of-order pipeline analysis across 6 AArch64 benchmarks</p>
+  </header>
+
+  <div class="cards" id="cards"></div>
+
+  <div class="bench-tabs" id="benchTabs"></div>
+
+  <div class="charts">
+    <div class="chart-card">
+      <h3>Instruction Mix</h3>
+      <canvas id="chartInstrMix"></canvas>
+    </div>
+    <div class="chart-card">
+      <h3>Branch Prediction Accuracy</h3>
+      <canvas id="chartBranchAcc"></canvas>
+    </div>
+    <div class="chart-card">
+      <h3>BTB / RAS Hit Rate</h3>
+      <canvas id="chartBtbRas"></canvas>
+    </div>
+    <div class="chart-card">
+      <h3>Cache Hierarchy — L1 Operations</h3>
+      <canvas id="chartCacheL1"></canvas>
+    </div>
+    <div class="charts full">
+      <div class="chart-card">
+        <h3>Pipeline Stall Breakdown</h3>
+        <canvas id="chartStalls"></canvas>
+      </div>
+    </div>
+    <div class="chart-card">
+      <h3>Functional Unit Utilization (busy cycles)</h3>
+      <canvas id="chartFU"></canvas>
+    </div>
+    <div class="chart-card">
+      <h3>Issue Width Distribution</h3>
+      <canvas id="chartIssueWidth"></canvas>
+    </div>
+    <div class="charts full">
+      <div class="chart-card">
+        <h3>CPI / IPC Overview</h3>
+        <canvas id="chartIPC"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <div class="table-wrap">
+    <h3>Detailed Metrics Table</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>Benchmark</th>
+          <th>Instructions</th>
+          <th>Cycles</th>
+          <th>IPC</th>
+          <th>CPI</th>
+          <th>Mem %</th>
+          <th>Branches</th>
+          <th>Mispred</th>
+          <th>Branch Acc %</th>
+          <th>Squashes</th>
+          <th>ROB Stalls</th>
+          <th>IQ Stalls</th>
+          <th>Cache Stalls</th>
+          <th>Total Stalls</th>
+          <th>L1 Writes</th>
+          <th>Wall (ms)</th>
+          <th>Instr/s</th>
+        </tr>
+      </thead>
+      <tbody id="tableBody"></tbody>
+    </table>
+  </div>
+
+  <footer>ARM CPU Emulator &mdash; ESL-level OoO timing simulator &bull; GEM5-style profiling</footer>
+</div>
+
+<script>
+// ===================== EMBEDDED BENCHMARK DATA =====================
+const BENCHMARKS = {
+  fibonacci: {
+    total_instructions: 285,
+    total_cycles: 103,
+    ipc: 2.767,
+    cpi: 0.361,
+    memory_instr_pct: 0.70,
+    branch_instr_pct: 48.42,
+    instructions: {
+      "STP": 1, "SUB": 35, "MOV": 74, "ADD": 35, "B": 102,
+      "ADR": 1, "B.cond": 35, "STR": 1, "BR": 1
+    },
+    branch_predictor: {
+      total_branches: 138, taken: 138, not_taken: 0,
+      correct: 35, mispredictions: 103, accuracy: 25.36,
+      btb_hits: 138, btb_misses: 0, btb_hit_rate: 100.00,
+      ras_hits: 0, ras_misses: 138, squashes: 103, branch_mpki: 361.40
+    },
+    fu_utilization: {
+      int_alu_busy_cycles: 145, int_alu_issued: 145,
+      int_mul_busy_cycles: 0,
+      load_busy_cycles: 0, load_issued: 0,
+      store_busy_cycles: 8, store_issued: 2,
+      branch_busy_cycles: 138, branch_issued: 138,
+      fp_simd_busy_cycles: 0, fp_simd_issued: 0,
+      total_cycles: 103
+    },
+    pipeline_stalls: {
+      rob_full: 4, iq_full: 0, lsq_full: 0, cache_miss: 0,
+      branch_mispredict: 0, total_stall_cycles: 4,
+      issue_width_dist: { "0": 29, "1": 0, "2": 5, "3": 1, "4_plus": 68 }
+    },
+    cache_detail: {
+      l1: { reads: 0, writes: 2, read_misses: 0, write_misses: 0, writebacks: 0, evictions: 0 },
+      l2: { reads: 0, writes: 0, read_misses: 0, write_misses: 0, writebacks: 0, evictions: 0 }
+    },
+    wall_time_ms: 1.238,
+    instr_per_sec: 230249,
+    cycles_per_sec: 83213
+  },
+  matmul: {
+    total_instructions: 2508,
+    total_cycles: 4336,
+    ipc: 0.578,
+    cpi: 1.729,
+    memory_instr_pct: 41.31,
+    branch_instr_pct: 9.85,
+    instructions: {
+      "STP": 1, "SUB": 1, "OTHER": 176, "MOV": 1, "ADR": 179,
+      "B": 124, "STR": 251, "NOP": 1, "ADD": 521, "CMP": 122,
+      "LSL": 160, "B.cond": 122, "MUL": 64, "LDR": 784, "BR": 1
+    },
+    branch_predictor: {
+      total_branches: 247, taken: 247, not_taken: 0,
+      correct: 122, mispredictions: 125, accuracy: 49.39,
+      btb_hits: 247, btb_misses: 0, btb_hit_rate: 100.00,
+      ras_hits: 0, ras_misses: 247, squashes: 125, branch_mpki: 49.84
+    },
+    fu_utilization: {
+      int_alu_busy_cycles: 1161, int_alu_issued: 1161,
+      int_mul_busy_cycles: 192,
+      load_busy_cycles: 0, load_issued: 0,
+      store_busy_cycles: 4144, store_issued: 1036,
+      branch_busy_cycles: 247, branch_issued: 247,
+      fp_simd_busy_cycles: 0, fp_simd_issued: 64,
+      total_cycles: 4336
+    },
+    pipeline_stalls: {
+      rob_full: 2490, iq_full: 0, lsq_full: 0, cache_miss: 0,
+      branch_mispredict: 0, total_stall_cycles: 2490,
+      issue_width_dist: { "0": 2451, "1": 1290, "2": 573, "3": 16, "4_plus": 6 }
+    },
+    cache_detail: {
+      l1: { reads: 0, writes: 1036, read_misses: 0, write_misses: 0, writebacks: 0, evictions: 0 },
+      l2: { reads: 0, writes: 0, read_misses: 0, write_misses: 0, writebacks: 0, evictions: 0 }
+    },
+    wall_time_ms: 8.261,
+    instr_per_sec: 303578,
+    cycles_per_sec: 524847
+  },
+  linkedlist: {
+    total_instructions: 1661,
+    total_cycles: 2750,
+    ipc: 0.604,
+    cpi: 1.656,
+    memory_instr_pct: 39.01,
+    branch_instr_pct: 10.84,
+    instructions: {
+      "STP": 1, "CSEL": 16, "SUB": 17, "OTHER": 32, "MOV": 1,
+      "B": 107, "ADR": 129, "STR": 203, "MUL": 16, "LDR": 444,
+      "NOP": 1, "ADD": 389, "CMP": 72, "LSL": 128, "B.cond": 72,
+      "AND": 32, "BR": 1
+    },
+    branch_predictor: {
+      total_branches: 180, taken: 180, not_taken: 0,
+      correct: 72, mispredictions: 108, accuracy: 40.00,
+      btb_hits: 180, btb_misses: 0, btb_hit_rate: 100.00,
+      ras_hits: 0, ras_misses: 180, squashes: 108, branch_mpki: 65.02
+    },
+    fu_utilization: {
+      int_alu_busy_cycles: 817, int_alu_issued: 817,
+      int_mul_busy_cycles: 48,
+      load_busy_cycles: 0, load_issued: 0,
+      store_busy_cycles: 2592, store_issued: 648,
+      branch_busy_cycles: 180, branch_issued: 180,
+      fp_simd_busy_cycles: 0, fp_simd_issued: 16,
+      total_cycles: 2750
+    },
+    pipeline_stalls: {
+      rob_full: 1549, iq_full: 0, lsq_full: 0, cache_miss: 0,
+      branch_mispredict: 0, total_stall_cycles: 1549,
+      issue_width_dist: { "0": 1459, "1": 964, "2": 292, "3": 27, "4_plus": 8 }
+    },
+    cache_detail: {
+      l1: { reads: 0, writes: 648, read_misses: 0, write_misses: 0, writebacks: 0, evictions: 0 },
+      l2: { reads: 0, writes: 0, read_misses: 0, write_misses: 0, writebacks: 0, evictions: 0 }
+    },
+    wall_time_ms: 4.092,
+    instr_per_sec: 405877,
+    cycles_per_sec: 671981
+  },
+  qsort: {
+    total_instructions: 3376,
+    total_cycles: 7514,
+    ipc: 0.449,
+    cpi: 2.226,
+    memory_instr_pct: 54.53,
+    branch_instr_pct: 14.10,
+    instructions: {
+      "STP": 45, "MOV": 161, "B": 195, "LDP": 44, "ADR": 20,
+      "STR": 486, "LDR": 1266, "NOP": 65, "ADD": 361, "CMP": 202,
+      "LSL": 155, "B.cond": 202, "SUB": 79, "OTHER": 16, "BR": 79
+    },
+    branch_predictor: {
+      total_branches: 476, taken: 476, not_taken: 0,
+      correct: 202, mispredictions: 274, accuracy: 42.44,
+      btb_hits: 476, btb_misses: 0, btb_hit_rate: 100.00,
+      ras_hits: 0, ras_misses: 476, squashes: 274, branch_mpki: 81.16
+    },
+    fu_utilization: {
+      int_alu_busy_cycles: 1059, int_alu_issued: 1059,
+      int_mul_busy_cycles: 0,
+      load_busy_cycles: 0, load_issued: 0,
+      store_busy_cycles: 7364, store_issued: 1841,
+      branch_busy_cycles: 476, branch_issued: 476,
+      fp_simd_busy_cycles: 0, fp_simd_issued: 0,
+      total_cycles: 7514
+    },
+    pipeline_stalls: {
+      rob_full: 4927, iq_full: 0, lsq_full: 0, cache_miss: 0,
+      branch_mispredict: 0, total_stall_cycles: 4927,
+      issue_width_dist: { "0": 4846, "1": 1995, "2": 649, "3": 13, "4_plus": 11 }
+    },
+    cache_detail: {
+      l1: { reads: 0, writes: 1841, read_misses: 0, write_misses: 0, writebacks: 0, evictions: 0 },
+      l2: { reads: 0, writes: 0, read_misses: 0, write_misses: 0, writebacks: 0, evictions: 0 }
+    },
+    wall_time_ms: 14.091,
+    instr_per_sec: 239593,
+    cycles_per_sec: 533264
+  },
+  dhrystone: {
+    total_instructions: 578,
+    total_cycles: 263,
+    ipc: 2.198,
+    cpi: 0.455,
+    memory_instr_pct: 10.21,
+    branch_instr_pct: 26.47,
+    instructions: {
+      "STP": 2, "MOV": 58, "ADR": 2, "B": 102, "LDR": 1,
+      "STR": 56, "NOP": 3, "ADD": 202, "SUB": 100, "LSL": 1,
+      "B.cond": 50, "BR": 1
+    },
+    branch_predictor: {
+      total_branches: 153, taken: 153, not_taken: 0,
+      correct: 50, mispredictions: 103, accuracy: 32.68,
+      btb_hits: 153, btb_misses: 0, btb_hit_rate: 100.00,
+      ras_hits: 0, ras_misses: 153, squashes: 103, branch_mpki: 178.20
+    },
+    fu_utilization: {
+      int_alu_busy_cycles: 366, int_alu_issued: 366,
+      int_mul_busy_cycles: 0,
+      load_busy_cycles: 0, load_issued: 0,
+      store_busy_cycles: 236, store_issued: 59,
+      branch_busy_cycles: 153, branch_issued: 153,
+      fp_simd_busy_cycles: 0, fp_simd_issued: 0,
+      total_cycles: 263
+    },
+    pipeline_stalls: {
+      rob_full: 48, iq_full: 0, lsq_full: 0, cache_miss: 0,
+      branch_mispredict: 0, total_stall_cycles: 48,
+      issue_width_dist: { "0": 47, "1": 44, "2": 50, "3": 54, "4_plus": 68 }
+    },
+    cache_detail: {
+      l1: { reads: 0, writes: 59, read_misses: 0, write_misses: 0, writebacks: 0, evictions: 0 },
+      l2: { reads: 0, writes: 0, read_misses: 0, write_misses: 0, writebacks: 0, evictions: 0 }
+    },
+    wall_time_ms: 1.018,
+    instr_per_sec: 567966,
+    cycles_per_sec: 258434
+  },
+  memcpy_bench: {
+    total_instructions: 7555,
+    total_cycles: 16963,
+    ipc: 0.445,
+    cpi: 2.245,
+    memory_instr_pct: 54.12,
+    branch_instr_pct: 7.70,
+    instructions: {
+      "STP": 2, "MOV": 71, "B": 115, "STR": 926, "LDR": 3160,
+      "NOP": 11, "ADD": 1365, "CMP": 461, "LSL": 704, "B.cond": 461,
+      "LDP": 1, "ADR": 139, "OTHER": 64, "SUB": 69, "BR": 6
+    },
+    branch_predictor: {
+      total_branches: 582, taken: 582, not_taken: 0,
+      correct: 461, mispredictions: 121, accuracy: 79.21,
+      btb_hits: 582, btb_misses: 0, btb_hit_rate: 100.00,
+      ras_hits: 0, ras_misses: 582, squashes: 121, branch_mpki: 16.02
+    },
+    fu_utilization: {
+      int_alu_busy_cycles: 2884, int_alu_issued: 2884,
+      int_mul_busy_cycles: 0,
+      load_busy_cycles: 0, load_issued: 0,
+      store_busy_cycles: 16356, store_issued: 4089,
+      branch_busy_cycles: 582, branch_issued: 582,
+      fp_simd_busy_cycles: 0, fp_simd_issued: 0,
+      total_cycles: 16963
+    },
+    pipeline_stalls: {
+      rob_full: 10341, iq_full: 0, lsq_full: 0, cache_miss: 0,
+      branch_mispredict: 0, total_stall_cycles: 10341,
+      issue_width_dist: { "0": 11216, "1": 3967, "2": 1761, "3": 10, "4_plus": 9 }
+    },
+    cache_detail: {
+      l1: { reads: 0, writes: 4089, read_misses: 0, write_misses: 0, writebacks: 0, evictions: 0 },
+      l2: { reads: 0, writes: 0, read_misses: 0, write_misses: 0, writebacks: 0, evictions: 0 }
+    },
+    wall_time_ms: 34.685,
+    instr_per_sec: 217815,
+    cycles_per_sec: 489052
+  }
+};
+
+// ===================== CONSTANTS =====================
+const BLUE   = '#58a6ff';
+const PINK   = '#f97583';
+const GREEN  = '#3fb950';
+const ORANGE = '#d29922';
+const PURPLE = '#bc8cff';
+const CYAN   = '#56d4dd';
+const GRID   = 'rgba(139,148,158,0.15)';
+const TICK   = '#8b949e';
+
+const BLUE_BG   = 'rgba(88,166,255,0.65)';
+const PINK_BG   = 'rgba(249,117,131,0.65)';
+const GREEN_BG  = 'rgba(63,185,80,0.65)';
+const ORANGE_BG = 'rgba(210,153,34,0.65)';
+const PURPLE_BG = 'rgba(188,140,255,0.65)';
+const CYAN_BG   = 'rgba(86,212,221,0.65)';
+
+const names = Object.keys(BENCHMARKS);
+const data  = names.map(n => BENCHMARKS[n]);
+const avg   = arr => arr.reduce((a, b) => a + b, 0) / arr.length;
+
+// ===================== CHART.JS DEFAULTS =====================
+Chart.defaults.color = TICK;
+Chart.defaults.borderColor = GRID;
+Chart.defaults.font.family = "-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, sans-serif";
+Chart.defaults.font.size = 12;
+
+const commonPlugins = {
+  legend: {
+    labels: { color: '#e6edf3', boxWidth: 14, padding: 16 }
+  },
+  tooltip: {
+    backgroundColor: '#1c2128',
+    borderColor: '#30363d',
+    borderWidth: 1,
+    titleColor: '#e6edf3',
+    bodyColor: '#e6edf3',
+    padding: 10
+  }
+};
+
+// ===================== SECTION 1: SUMMARY CARDS =====================
+const avgIPC = avg(data.map(d => d.ipc));
+const avgMispred = avg(data.map(d => d.branch_predictor.mispredictions / d.branch_predictor.total_branches * 100));
+const avgStallRate = avg(data.map(d => d.pipeline_stalls.total_stall_cycles / d.total_cycles * 100));
+
+document.getElementById('cards').innerHTML = `
+  <div class="card c-ipc">
+    <div class="label">Average IPC</div>
+    <div class="value">${avgIPC.toFixed(2)}</div>
+    <div class="sub">instructions per cycle (higher is better)</div>
+  </div>
+  <div class="card c-mispred">
+    <div class="label">Avg Branch Mispred Rate</div>
+    <div class="value">${avgMispred.toFixed(1)}%</div>
+    <div class="sub">${avg(data.map(d => d.branch_predictor.mispredictions)).toFixed(0)} mispredictions avg</div>
+  </div>
+  <div class="card c-miss">
+    <div class="label">L1 / L2 Cache Misses</div>
+    <div class="value">0</div>
+    <div class="sub">All cache hits (no misses recorded)</div>
+  </div>
+  <div class="card c-stall">
+    <div class="label">Avg Stall Rate</div>
+    <div class="value">${avgStallRate.toFixed(1)}%</div>
+    <div class="sub">stall cycles / total cycles</div>
+  </div>
+`;
+
+// ===================== BENCHMARK TABS =====================
+const tabsEl = document.getElementById('benchTabs');
+names.forEach((name, i) => {
+  const btn = document.createElement('button');
+  btn.className = 'bench-tab' + (i === 0 ? ' active' : '');
+  btn.textContent = name;
+  btn.onclick = () => {
+    document.querySelectorAll('.bench-tab').forEach(t => t.classList.remove('active'));
+    btn.classList.add('active');
+    updateInstrMix(i);
+  };
+  tabsEl.appendChild(btn);
+});
+
+// ===================== SECTION 2: INSTRUCTION MIX (DONUT) =====================
+// Categorize instructions into groups
+function categorizeInstr(instrMap) {
+  const categories = { 'Int ALU': 0, 'Load/Store': 0, 'Branch': 0, 'Other': 0 };
+  for (const [op, count] of Object.entries(instrMap)) {
+    if (['ADD','SUB','MUL','AND','ORR','EOR','LSL','LSR','ASR','MOV','CSEL','CMP','NOP'].includes(op)) {
+      categories['Int ALU'] += count;
+    } else if (['LDR','STR','LDP','STP','LDUR','STUR'].includes(op)) {
+      categories['Load/Store'] += count;
+    } else if (['B','B.cond','BR','BL','CBZ','CBNZ','TBZ','TBNZ','RET'].includes(op)) {
+      categories['Branch'] += count;
+    } else {
+      categories['Other'] += count;
+    }
+  }
+  return categories;
+}
+
+let instrMixChart;
+function createInstrMix(benchIdx) {
+  const cats = categorizeInstr(data[benchIdx].instructions);
+  const ctx = document.getElementById('chartInstrMix');
+  if (instrMixChart) instrMixChart.destroy();
+  instrMixChart = new Chart(ctx, {
+    type: 'doughnut',
+    data: {
+      labels: Object.keys(cats),
+      datasets: [{
+        data: Object.values(cats),
+        backgroundColor: [BLUE_BG, GREEN_BG, ORANGE_BG, PURPLE_BG],
+        borderColor: [BLUE, GREEN, ORANGE, PURPLE],
+        borderWidth: 1.5
+      }]
+    },
+    options: {
+      responsive: true,
+      cutout: '55%',
+      plugins: {
+        ...commonPlugins,
+        legend: {
+          ...commonPlugins.legend,
+          position: 'right'
+        },
+        title: {
+          display: true,
+          text: `${names[benchIdx]} (${data[benchIdx].total_instructions} instructions)`,
+          color: '#e6edf3',
+          font: { size: 13, weight: 600 }
+        }
+      }
+    }
+  });
+}
+function updateInstrMix(idx) { createInstrMix(idx); }
+createInstrMix(0);
+
+// ===================== SECTION 3a: BRANCH PREDICTION ACCURACY =====================
+new Chart(document.getElementById('chartBranchAcc'), {
+  type: 'bar',
+  data: {
+    labels: names,
+    datasets: [
+      {
+        label: 'Correct',
+        data: data.map(d => d.branch_predictor.correct),
+        backgroundColor: GREEN_BG,
+        borderColor: GREEN,
+        borderWidth: 1
+      },
+      {
+        label: 'Mispredictions',
+        data: data.map(d => d.branch_predictor.mispredictions),
+        backgroundColor: PINK_BG,
+        borderColor: PINK,
+        borderWidth: 1
+      }
+    ]
+  },
+  options: {
+    responsive: true,
+    scales: {
+      x: { grid: { display: false }, ticks: { color: TICK }, stacked: true },
+      y: { grid: { color: GRID }, ticks: { color: TICK }, stacked: true, title: { display: true, text: 'Branches', color: TICK } }
+    },
+    plugins: commonPlugins
+  }
+});
+
+// ===================== SECTION 3b: BTB / RAS =====================
+new Chart(document.getElementById('chartBtbRas'), {
+  type: 'bar',
+  data: {
+    labels: names,
+    datasets: [
+      { label: 'BTB Hits', data: data.map(d => d.branch_predictor.btb_hits), backgroundColor: BLUE_BG, borderColor: BLUE, borderWidth: 1 },
+      { label: 'BTB Misses', data: data.map(d => d.branch_predictor.btb_misses), backgroundColor: 'rgba(88,166,255,0.2)', borderColor: BLUE, borderWidth: 1 },
+      { label: 'RAS Hits', data: data.map(d => d.branch_predictor.ras_hits), backgroundColor: GREEN_BG, borderColor: GREEN, borderWidth: 1 },
+      { label: 'RAS Misses', data: data.map(d => d.branch_predictor.ras_misses), backgroundColor: 'rgba(63,185,80,0.2)', borderColor: GREEN, borderWidth: 1 }
+    ]
+  },
+  options: {
+    responsive: true,
+    scales: {
+      x: { grid: { display: false }, ticks: { color: TICK } },
+      y: { grid: { color: GRID }, ticks: { color: TICK }, title: { display: true, text: 'Count', color: TICK } }
+    },
+    plugins: commonPlugins
+  }
+});
+
+// ===================== SECTION 4: CACHE HIERARCHY =====================
+new Chart(document.getElementById('chartCacheL1'), {
+  type: 'bar',
+  data: {
+    labels: names,
+    datasets: [
+      { label: 'L1 Reads', data: data.map(d => d.cache_detail.l1.reads), backgroundColor: BLUE_BG, borderColor: BLUE, borderWidth: 1 },
+      { label: 'L1 Writes', data: data.map(d => d.cache_detail.l1.writes), backgroundColor: GREEN_BG, borderColor: GREEN, borderWidth: 1 },
+      { label: 'L1 Read Misses', data: data.map(d => d.cache_detail.l1.read_misses), backgroundColor: PINK_BG, borderColor: PINK, borderWidth: 1 },
+      { label: 'L1 Write Misses', data: data.map(d => d.cache_detail.l1.write_misses), backgroundColor: ORANGE_BG, borderColor: ORANGE, borderWidth: 1 }
+    ]
+  },
+  options: {
+    responsive: true,
+    scales: {
+      x: { grid: { display: false }, ticks: { color: TICK } },
+      y: { grid: { color: GRID }, ticks: { color: TICK }, title: { display: true, text: 'Operations', color: TICK } }
+    },
+    plugins: commonPlugins
+  }
+});
+
+// ===================== SECTION 5: PIPELINE STALLS (HORIZONTAL STACKED) =====================
+new Chart(document.getElementById('chartStalls'), {
+  type: 'bar',
+  data: {
+    labels: names,
+    datasets: [
+      { label: 'ROB Full', data: data.map(d => d.pipeline_stalls.rob_full), backgroundColor: BLUE_BG, borderColor: BLUE, borderWidth: 1 },
+      { label: 'IQ Full', data: data.map(d => d.pipeline_stalls.iq_full), backgroundColor: GREEN_BG, borderColor: GREEN, borderWidth: 1 },
+      { label: 'LSQ Full', data: data.map(d => d.pipeline_stalls.lsq_full), backgroundColor: PURPLE_BG, borderColor: PURPLE, borderWidth: 1 },
+      { label: 'Cache Miss', data: data.map(d => d.pipeline_stalls.cache_miss), backgroundColor: PINK_BG, borderColor: PINK, borderWidth: 1 },
+      { label: 'Branch Mispredict', data: data.map(d => d.pipeline_stalls.branch_mispredict), backgroundColor: ORANGE_BG, borderColor: ORANGE, borderWidth: 1 }
+    ]
+  },
+  options: {
+    responsive: true,
+    indexAxis: 'y',
+    scales: {
+      x: { grid: { color: GRID }, ticks: { color: TICK }, stacked: true, title: { display: true, text: 'Stall Cycles', color: TICK } },
+      y: { grid: { display: false }, ticks: { color: TICK }, stacked: true }
+    },
+    plugins: commonPlugins
+  }
+});
+
+// ===================== SECTION 6: FU UTILIZATION (STACKED BAR) =====================
+new Chart(document.getElementById('chartFU'), {
+  type: 'bar',
+  data: {
+    labels: names,
+    datasets: [
+      { label: 'Int ALU', data: data.map(d => d.fu_utilization.int_alu_busy_cycles), backgroundColor: BLUE_BG, borderColor: BLUE, borderWidth: 1 },
+      { label: 'Int MUL', data: data.map(d => d.fu_utilization.int_mul_busy_cycles), backgroundColor: CYAN_BG, borderColor: CYAN, borderWidth: 1 },
+      { label: 'Load', data: data.map(d => d.fu_utilization.load_busy_cycles), backgroundColor: GREEN_BG, borderColor: GREEN, borderWidth: 1 },
+      { label: 'Store', data: data.map(d => d.fu_utilization.store_busy_cycles), backgroundColor: ORANGE_BG, borderColor: ORANGE, borderWidth: 1 },
+      { label: 'Branch', data: data.map(d => d.fu_utilization.branch_busy_cycles), backgroundColor: PINK_BG, borderColor: PINK, borderWidth: 1 },
+      { label: 'FP/SIMD', data: data.map(d => d.fu_utilization.fp_simd_busy_cycles), backgroundColor: PURPLE_BG, borderColor: PURPLE, borderWidth: 1 }
+    ]
+  },
+  options: {
+    responsive: true,
+    scales: {
+      x: { grid: { display: false }, ticks: { color: TICK }, stacked: true },
+      y: { grid: { color: GRID }, ticks: { color: TICK }, stacked: true, title: { display: true, text: 'Busy Cycles', color: TICK } }
+    },
+    plugins: commonPlugins
+  }
+});
+
+// ===================== SECTION 7: ISSUE WIDTH DISTRIBUTION =====================
+new Chart(document.getElementById('chartIssueWidth'), {
+  type: 'bar',
+  data: {
+    labels: names,
+    datasets: [
+      { label: '0 issued', data: data.map(d => d.pipeline_stalls.issue_width_dist["0"]), backgroundColor: PINK_BG, borderColor: PINK, borderWidth: 1 },
+      { label: '1 issued', data: data.map(d => d.pipeline_stalls.issue_width_dist["1"]), backgroundColor: ORANGE_BG, borderColor: ORANGE, borderWidth: 1 },
+      { label: '2 issued', data: data.map(d => d.pipeline_stalls.issue_width_dist["2"]), backgroundColor: CYAN_BG, borderColor: CYAN, borderWidth: 1 },
+      { label: '3 issued', data: data.map(d => d.pipeline_stalls.issue_width_dist["3"]), backgroundColor: GREEN_BG, borderColor: GREEN, borderWidth: 1 },
+      { label: '4+ issued', data: data.map(d => d.pipeline_stalls.issue_width_dist["4_plus"]), backgroundColor: BLUE_BG, borderColor: BLUE, borderWidth: 1 }
+    ]
+  },
+  options: {
+    responsive: true,
+    scales: {
+      x: { grid: { display: false }, ticks: { color: TICK }, stacked: true },
+      y: { grid: { color: GRID }, ticks: { color: TICK }, stacked: true, title: { display: true, text: 'Cycles', color: TICK } }
+    },
+    plugins: commonPlugins
+  }
+});
+
+// ===================== SECTION 8: CPI / IPC OVERVIEW =====================
+new Chart(document.getElementById('chartIPC'), {
+  type: 'bar',
+  data: {
+    labels: names,
+    datasets: [
+      {
+        label: 'IPC',
+        data: data.map(d => d.ipc),
+        backgroundColor: BLUE_BG,
+        borderColor: BLUE,
+        borderWidth: 1,
+        yAxisID: 'y'
+      },
+      {
+        label: 'CPI',
+        data: data.map(d => d.cpi),
+        backgroundColor: ORANGE_BG,
+        borderColor: ORANGE,
+        borderWidth: 1,
+        yAxisID: 'y'
+      },
+      {
+        label: 'Total Instructions',
+        data: data.map(d => d.total_instructions),
+        type: 'line',
+        borderColor: GREEN,
+        backgroundColor: 'rgba(63,185,80,0.1)',
+        borderWidth: 2,
+        pointRadius: 4,
+        pointBackgroundColor: GREEN,
+        tension: 0.3,
+        yAxisID: 'y1'
+      }
+    ]
+  },
+  options: {
+    responsive: true,
+    scales: {
+      x: { grid: { display: false }, ticks: { color: TICK } },
+      y: {
+        grid: { color: GRID },
+        ticks: { color: TICK },
+        position: 'left',
+        title: { display: true, text: 'IPC / CPI', color: TICK }
+      },
+      y1: {
+        grid: { display: false },
+        ticks: { color: GREEN },
+        position: 'right',
+        title: { display: true, text: 'Instructions', color: GREEN }
+      }
+    },
+    plugins: commonPlugins
+  }
+});
+
+// ===================== DETAILED TABLE =====================
+const tbody = document.getElementById('tableBody');
+names.forEach((name, i) => {
+  const d = data[i];
+  const bp = d.branch_predictor;
+  const acc = bp.accuracy;
+  const stallPct = (d.pipeline_stalls.total_stall_cycles / d.total_cycles * 100).toFixed(1);
+  const row = document.createElement('tr');
+  row.innerHTML = `
+    <td class="bname">${name}</td>
+    <td>${d.total_instructions.toLocaleString()}</td>
+    <td>${d.total_cycles.toLocaleString()}</td>
+    <td style="color:var(--blue);font-weight:500">${d.ipc.toFixed(3)}</td>
+    <td>${d.cpi.toFixed(3)}</td>
+    <td>${d.memory_instr_pct.toFixed(1)}%</td>
+    <td>${bp.total_branches}</td>
+    <td class="${bp.mispredictions > bp.correct ? 'bad' : 'good'}">${bp.mispredictions}</td>
+    <td class="${acc >= 70 ? 'good' : acc >= 40 ? 'warn' : 'bad'}">${acc.toFixed(1)}%</td>
+    <td>${bp.squashes}</td>
+    <td>${d.pipeline_stalls.rob_full.toLocaleString()}</td>
+    <td>${d.pipeline_stalls.iq_full}</td>
+    <td>${d.pipeline_stalls.cache_miss}</td>
+    <td class="${parseFloat(stallPct) > 60 ? 'bad' : parseFloat(stallPct) > 20 ? 'warn' : 'good'}">${d.pipeline_stalls.total_stall_cycles.toLocaleString()} (${stallPct}%)</td>
+    <td>${d.cache_detail.l1.writes}</td>
+    <td>${d.wall_time_ms.toFixed(1)}</td>
+    <td>${d.instr_per_sec.toLocaleString()}</td>
+  `;
+  tbody.appendChild(row);
+});
+</script>
+</body>
+</html>

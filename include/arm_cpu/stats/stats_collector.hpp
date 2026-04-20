@@ -177,6 +177,30 @@ public:
     void record_l2_access(bool hit);
     void record_l2_eviction();
 
+    /// Record detailed cache access (read/write, miss latency)
+    void record_l1_read(bool hit, uint64_t latency = 0);
+    void record_l1_write(bool hit, uint64_t latency = 0);
+    void record_l2_read(bool hit, uint64_t latency = 0);
+    void record_l2_write(bool hit, uint64_t latency = 0);
+    void record_l1_writeback();
+    void record_l2_writeback();
+
+    /// Record branch prediction event
+    void record_branch(bool taken, bool predicted_taken, bool btb_hit, bool ras_hit);
+
+    /// Record FU utilization
+    void record_fu_issued(OpcodeType opcode_type, uint64_t latency);
+
+    /// Record pipeline stall
+    void record_stall_rob_full();
+    void record_stall_iq_full();
+    void record_stall_lsq_full();
+    void record_stall_cache_miss();
+    void record_stall_branch_mispredict();
+
+    /// Record issue width distribution
+    void record_issue_width(uint32_t issued_this_cycle);
+
     /// Record memory load/store
     void record_load(uint64_t bytes, uint64_t latency);
     void record_store(uint64_t bytes, uint64_t latency);
@@ -232,6 +256,16 @@ private:
     std::unordered_map<InstructionId, InstrTiming, InstructionId::Hash> instr_timing_;
     std::deque<double> ipc_history_;
     std::size_t max_history_;
+
+    // GEM5-like profiling counters
+    BranchPredictorMetrics branch_stats_;
+    FUUtilization fu_stats_;
+    PipelineStallMetrics stall_stats_;
+    DetailedCacheMetrics cache_detail_;
+    uint64_t l1_miss_latency_total_ = 0;
+    uint64_t l1_miss_count_ = 0;
+    uint64_t l2_miss_latency_total_ = 0;
+    uint64_t l2_miss_count_ = 0;
 };
 
 } // namespace arm_cpu

@@ -14,6 +14,7 @@
 #include "arm_cpu/memory/memory_subsystem.hpp"
 
 #include <cmath>
+#include <chrono>
 #include <ctime>
 #include <cstdio>
 #include <filesystem>
@@ -47,6 +48,8 @@ struct CliArgs {
     bool save_trace = false;
     std::string trace_output_file;
     std::string output_file;                   // Konata JSON output path
+    std::string viz_format = "json";            // "json" or "kanata"
+    std::string preset;                        // "default", "high_performance", "minimal", "gem5_o3_arm_v7a"
     bool verbose = false;
     bool json_output = false;
 
@@ -77,6 +80,7 @@ void print_usage(const char* program_name) {
         "  -j, --json               Output results in JSON format\n"
         "\n"
         "CPU Configuration:\n"
+        "  --preset <name>          Config preset: default, high_performance, minimal, gem5_o3_arm_v7a\n"
         "  --window-size <n>        Instruction window size (default: 128)\n"
         "  --fetch-width <n>        Fetch width (default: 8)\n"
         "  --issue-width <n>        Issue width (default: 4)\n"
@@ -92,6 +96,7 @@ void print_usage(const char* program_name) {
         "\n"
         "Output:\n"
         "  -o, --output <file>      Save Konata visualization JSON to file (default: output/<stem>_YYYYMMDD_HHMM.json)\n"
+        "  --viz-format <fmt>       Visualization format: json, kanata (default: json)\n"
         "  --save-trace <file>      Save execution trace to file\n"
         "\n"
         "General:\n"
@@ -195,6 +200,14 @@ bool parse_args(int argc, char* argv[], CliArgs& args) {
             if (i + 1 >= argc) { std::fprintf(stderr, "Error: missing argument for %s\n", arg.data()); return false; }
             args.output_file = argv[++i];
         }
+        else if (arg == "--viz-format") {
+            if (i + 1 >= argc) { std::fprintf(stderr, "Error: missing argument for %s\n", arg.data()); return false; }
+            args.viz_format = argv[++i];
+        }
+        else if (arg == "--preset") {
+            if (i + 1 >= argc) { std::fprintf(stderr, "Error: missing argument for %s\n", arg.data()); return false; }
+            args.preset = argv[++i];
+        }
         else if (arg[0] == '-') {
             std::fprintf(stderr, "Error: unknown option: %s\n", arg.data());
             return false;
@@ -225,7 +238,17 @@ arm_cpu::TraceFormat parse_trace_format(std::string_view fmt) {
 }
 
 arm_cpu::CPUConfig build_config(const CliArgs& args) {
-    auto config = arm_cpu::CPUConfig::default_config();
+    arm_cpu::CPUConfig config;
+
+    if (args.preset == "high_performance") {
+        config = arm_cpu::CPUConfig::high_performance();
+    } else if (args.preset == "minimal") {
+        config = arm_cpu::CPUConfig::minimal();
+    } else if (args.preset == "gem5_o3_arm_v7a") {
+        config = arm_cpu::CPUConfig::gem5_o3_arm_v7a();
+    } else {
+        config = arm_cpu::CPUConfig::default_config();
+    }
 
     if (args.window_size > 0) config.window_size = args.window_size;
     if (args.fetch_width > 0) config.fetch_width = args.fetch_width;
@@ -290,9 +313,119 @@ void print_json_metrics(const arm_cpu::PerformanceMetrics& m) {
                      pct);
     }
     if (!first) std::printf("\n");
-    std::printf("  }\n");
+    std::printf("  },\n");
 
-    std::printf("}\n");
+    // Branch predictor metrics
+    const auto& bs = m.branch_stats;
+    std::printf(
+        "  \"branch_predictor\": {\n"
+        "    \"total_branches\": %llu,\n"
+        "    \"taken\": %llu,\n"
+        "    \"not_taken\": %llu,\n"
+        "    \"correct\": %llu,\n"
+        "    \"mispredictions\": %llu,\n"
+        "    \"accuracy\": %.2f,\n"
+        "    \"btb_hits\": %llu,\n"
+        "    \"btb_misses\": %llu,\n"
+        "    \"btb_hit_rate\": %.2f,\n"
+        "    \"ras_hits\": %llu,\n"
+        "    \"ras_misses\": %llu,\n"
+        "    \"squashes\": %llu,\n"
+        "    \"branch_mpki\": %.2f\n"
+        "  },\n",
+        static_cast<unsigned long long>(bs.branches),
+        static_cast<unsigned long long>(bs.taken),
+        static_cast<unsigned long long>(bs.not_taken),
+        static_cast<unsigned long long>(bs.correct_predictions),
+        static_cast<unsigned long long>(bs.mispredictions),
+        bs.accuracy() * 100.0,
+        static_cast<unsigned long long>(bs.btb_hits),
+        static_cast<unsigned long long>(bs.btb_misses),
+        bs.btb_hit_rate() * 100.0,
+        static_cast<unsigned long long>(bs.ras_hits),
+        static_cast<unsigned long long>(bs.ras_misses),
+        static_cast<unsigned long long>(bs.squashes),
+        bs.mpki(m.total_instructions)
+    );
+
+    // FU utilization
+    const auto& fu = m.fu_stats;
+    std::printf(
+        "  \"fu_utilization\": {\n"
+        "    \"int_alu_busy_cycles\": %llu,\n"
+        "    \"int_alu_issued\": %llu,\n"
+        "    \"int_mul_busy_cycles\": %llu,\n"
+        "    \"load_busy_cycles\": %llu,\n"
+        "    \"load_issued\": %llu,\n"
+        "    \"store_busy_cycles\": %llu,\n"
+        "    \"store_issued\": %llu,\n"
+        "    \"branch_busy_cycles\": %llu,\n"
+        "    \"branch_issued\": %llu,\n"
+        "    \"fp_simd_busy_cycles\": %llu,\n"
+        "    \"fp_simd_issued\": %llu,\n"
+        "    \"total_cycles\": %llu\n"
+        "  },\n",
+        static_cast<unsigned long long>(fu.int_alu_cycles),
+        static_cast<unsigned long long>(fu.int_alu_issued),
+        static_cast<unsigned long long>(fu.int_mul_cycles),
+        static_cast<unsigned long long>(fu.load_cycles),
+        static_cast<unsigned long long>(fu.load_issued),
+        static_cast<unsigned long long>(fu.store_cycles),
+        static_cast<unsigned long long>(fu.store_issued),
+        static_cast<unsigned long long>(fu.branch_cycles),
+        static_cast<unsigned long long>(fu.branch_issued),
+        static_cast<unsigned long long>(fu.fp_simd_cycles),
+        static_cast<unsigned long long>(fu.fp_simd_issued),
+        static_cast<unsigned long long>(fu.total_available_cycles)
+    );
+
+    // Pipeline stalls
+    const auto& st = m.stall_stats;
+    std::printf(
+        "  \"pipeline_stalls\": {\n"
+        "    \"rob_full\": %llu,\n"
+        "    \"iq_full\": %llu,\n"
+        "    \"lsq_full\": %llu,\n"
+        "    \"cache_miss\": %llu,\n"
+        "    \"branch_mispredict\": %llu,\n"
+        "    \"total_stall_cycles\": %llu,\n"
+        "    \"issue_width_dist\": { \"0\": %llu, \"1\": %llu, \"2\": %llu, \"3\": %llu, \"4_plus\": %llu }\n"
+        "  },\n",
+        static_cast<unsigned long long>(st.rob_full_stalls),
+        static_cast<unsigned long long>(st.iq_full_stalls),
+        static_cast<unsigned long long>(st.lsq_full_stalls),
+        static_cast<unsigned long long>(st.cache_miss_stalls),
+        static_cast<unsigned long long>(st.branch_mispredict_stalls),
+        static_cast<unsigned long long>(st.total_stall_cycles),
+        static_cast<unsigned long long>(st.issue_width_dist[0]),
+        static_cast<unsigned long long>(st.issue_width_dist[1]),
+        static_cast<unsigned long long>(st.issue_width_dist[2]),
+        static_cast<unsigned long long>(st.issue_width_dist[3]),
+        static_cast<unsigned long long>(st.issue_width_dist[4])
+    );
+
+    // Detailed cache metrics
+    const auto& cd = m.cache_detail;
+    std::printf(
+        "  \"cache_detail\": {\n"
+        "    \"l1\": { \"reads\": %llu, \"writes\": %llu, \"read_misses\": %llu, \"write_misses\": %llu, \"writebacks\": %llu, \"evictions\": %llu, \"avg_miss_latency\": %.2f },\n"
+        "    \"l2\": { \"reads\": %llu, \"writes\": %llu, \"read_misses\": %llu, \"write_misses\": %llu, \"writebacks\": %llu, \"evictions\": %llu, \"avg_miss_latency\": %.2f }\n"
+        "  }\n",
+        static_cast<unsigned long long>(cd.l1_reads),
+        static_cast<unsigned long long>(cd.l1_writes),
+        static_cast<unsigned long long>(cd.l1_read_misses),
+        static_cast<unsigned long long>(cd.l1_write_misses),
+        static_cast<unsigned long long>(cd.l1_writebacks),
+        static_cast<unsigned long long>(cd.l1_evictions),
+        cd.l1_avg_miss_latency,
+        static_cast<unsigned long long>(cd.l2_reads),
+        static_cast<unsigned long long>(cd.l2_writes),
+        static_cast<unsigned long long>(cd.l2_read_misses),
+        static_cast<unsigned long long>(cd.l2_write_misses),
+        static_cast<unsigned long long>(cd.l2_writebacks),
+        static_cast<unsigned long long>(cd.l2_evictions),
+        cd.l2_avg_miss_latency
+    );
 }
 
 int run_single(const CliArgs& args, int argc, char* argv[]) {
@@ -348,17 +481,35 @@ int run_single(const CliArgs& args, int argc, char* argv[]) {
             return std::move(*opt);
         };
 
+        auto sim_start = std::chrono::steady_clock::now();
         auto metrics = engine.value()->run_with_limit(next_instr, args.max_cycles);
+        auto sim_end = std::chrono::steady_clock::now();
         if (!metrics.ok()) {
             std::fprintf(stderr, "Error during simulation: %s\n",
                          metrics.error().message().c_str());
             return 1;
         }
 
+        auto elapsed_ms = std::chrono::duration<double, std::milli>(sim_end - sim_start).count();
+        const auto& m = metrics.value();
+        double instr_per_sec = (elapsed_ms > 0) ? static_cast<double>(m.total_instructions) / (elapsed_ms / 1000.0) : 0.0;
+        double cycles_per_sec = (elapsed_ms > 0) ? static_cast<double>(m.total_cycles) / (elapsed_ms / 1000.0) : 0.0;
+
         if (args.json_output) {
-            print_json_metrics(metrics.value());
+            print_json_metrics(m);
+            std::printf(",\n");
+            std::printf("  \"wall_time_ms\": %.3f,\n", elapsed_ms);
+            std::printf("  \"instr_per_sec\": %.0f,\n", instr_per_sec);
+            std::printf("  \"cycles_per_sec\": %.0f\n", cycles_per_sec);
+            std::printf("}\n");
         } else {
-            std::cout << metrics.value().summary() << std::endl;
+            std::cout << m.summary() << std::endl;
+            std::fprintf(stderr, "\n--- Timing ---\n");
+            std::fprintf(stderr, "  Wall time:    %.3f ms\n", elapsed_ms);
+            std::fprintf(stderr, "  Instructions: %llu (%.0f instr/s)\n",
+                         static_cast<unsigned long long>(m.total_instructions), instr_per_sec);
+            std::fprintf(stderr, "  Cycles:       %llu (%.0f cycles/s)\n",
+                         static_cast<unsigned long long>(m.total_cycles), cycles_per_sec);
         }
 
         // Save trace if requested
@@ -430,17 +581,35 @@ int run_single(const CliArgs& args, int argc, char* argv[]) {
             return std::move(*opt);
         };
 
+        auto sim_start = std::chrono::steady_clock::now();
         auto metrics = cpu->run_with_limit(next_instr, args.max_cycles);
+        auto sim_end = std::chrono::steady_clock::now();
         if (!metrics.ok()) {
             std::fprintf(stderr, "Error during simulation: %s\n",
                          metrics.error().message().c_str());
             return 1;
         }
 
+        auto elapsed_ms = std::chrono::duration<double, std::milli>(sim_end - sim_start).count();
+        const auto& m = metrics.value();
+        double instr_per_sec = (elapsed_ms > 0) ? static_cast<double>(m.total_instructions) / (elapsed_ms / 1000.0) : 0.0;
+        double cycles_per_sec = (elapsed_ms > 0) ? static_cast<double>(m.total_cycles) / (elapsed_ms / 1000.0) : 0.0;
+
         if (args.json_output) {
-            print_json_metrics(metrics.value());
+            print_json_metrics(m);
+            std::printf(",\n");
+            std::printf("  \"wall_time_ms\": %.3f,\n", elapsed_ms);
+            std::printf("  \"instr_per_sec\": %.0f,\n", instr_per_sec);
+            std::printf("  \"cycles_per_sec\": %.0f\n", cycles_per_sec);
+            std::printf("}\n");
         } else {
-            std::cout << metrics.value().summary() << std::endl;
+            std::cout << m.summary() << std::endl;
+            std::fprintf(stderr, "\n--- Timing ---\n");
+            std::fprintf(stderr, "  Wall time:    %.3f ms\n", elapsed_ms);
+            std::fprintf(stderr, "  Instructions: %llu (%.0f instr/s)\n",
+                         static_cast<unsigned long long>(m.total_instructions), instr_per_sec);
+            std::fprintf(stderr, "  Cycles:       %llu (%.0f cycles/s)\n",
+                         static_cast<unsigned long long>(m.total_cycles), cycles_per_sec);
         }
 
         // Save trace if requested
@@ -479,12 +648,17 @@ int run_single(const CliArgs& args, int argc, char* argv[]) {
             char ts[20];
             std::strftime(ts, sizeof(ts), "%Y%m%d_%H%M", &local_tm);
 
-            output_path = (output_dir / (stem + "_" + ts + ".json")).string();
+            output_path = (output_dir / (stem + "_" + ts + (args.viz_format == "kanata" ? ".knata" : ".json"))).string();
         } else {
             output_path = args.output_file;
         }
 
-        bool exported = cpu->visualization_mut().export_all_konata_to_file(output_path, true);
+        bool exported;
+        if (args.viz_format == "kanata") {
+            exported = cpu->visualization_mut().export_kanata_log_to_file(output_path);
+        } else {
+            exported = cpu->visualization_mut().export_all_konata_to_file(output_path, true);
+        }
 
         std::fprintf(stderr, "\n========================================\n");
         std::fprintf(stderr, "  Input:  %s\n", args.trace_file.c_str());

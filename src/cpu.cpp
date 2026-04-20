@@ -301,6 +301,11 @@ void CPUEmulator::fetch_dispatch(
     std::size_t dispatched = 0;
     std::size_t failed = 0;
 
+    // Track stall when window is full (no free slots)
+    if (free_slots == 0) {
+        stats_.record_stall_rob_full();
+    }
+
     while (dispatched < fetch_limit) {
         auto result = next_instr();
         if (!result.has_value()) break;
@@ -315,6 +320,7 @@ void CPUEmulator::fetch_dispatch(
             dispatched++;
         } else {
             failed++;
+            stats_.record_stall_iq_full();
             if (failed > 10) break;
         }
     }
@@ -323,6 +329,7 @@ void CPUEmulator::fetch_dispatch(
 Result<void> CPUEmulator::execute() {
     auto ready = ooo_engine_->get_ready_instructions();
 
+    uint32_t issued_count = 0;
     for (auto& [id, instr] : ready) {
         ooo_engine_->mark_executing(id);
         stats_.record_issue(id, current_cycle_);
@@ -349,12 +356,19 @@ Result<void> CPUEmulator::execute() {
             uint64_t complete_cycle = current_cycle_ + lat;
             ooo_engine_->mark_completed(id, complete_cycle);
 
+            // Record FU utilization
+            stats_.record_fu_issued(instr.opcode_type, lat);
+
             // Track execute and complete for visualization
             visualization_->pipeline_tracker().record_execute_start(id, current_cycle_);
             visualization_->pipeline_tracker().record_execute_end(id, complete_cycle);
             visualization_->pipeline_tracker().record_complete(id, complete_cycle);
         }
+        issued_count++;
     }
+
+    // Record issue width distribution
+    stats_.record_issue_width(issued_count);
 
     return {};
 }
@@ -393,16 +407,41 @@ Result<void> CPUEmulator::handle_memory_op(InstructionId id, const MemAccess& ac
             auto level = request.cache_info->servicing_level;
             if (level == CacheLevel::L1) {
                 stats_.record_l1_access(true);
+                stats_.record_l1_read(true);
             } else {
                 stats_.record_l1_access(false);
-                if (level == CacheLevel::L2) stats_.record_l2_access(true);
-                else stats_.record_l2_access(false);
+                stats_.record_l1_read(false, request.cache_info->total_latency);
+                stats_.record_stall_cache_miss();
+                if (level == CacheLevel::L2) {
+                    stats_.record_l2_access(true);
+                    stats_.record_l2_read(true);
+                } else {
+                    stats_.record_l2_access(false);
+                    stats_.record_l2_read(false, request.cache_info->total_latency);
+                }
             }
         } else {
             stats_.record_l1_access(true); // fallback: no cache info
+            stats_.record_l1_read(true);
         }
+        // Record FU utilization for loads
+        stats_.record_fu_issued(OpcodeType::Load, lat);
     } else {
         stats_.record_store(access.size, 1);
+        uint64_t lat = complete_cycle - current_cycle_;
+        if (request.cache_info.has_value()) {
+            auto level = request.cache_info->servicing_level;
+            if (level != CacheLevel::L1) {
+                stats_.record_stall_cache_miss();
+                stats_.record_l1_write(false, request.cache_info->total_latency);
+            } else {
+                stats_.record_l1_write(true);
+            }
+        } else {
+            stats_.record_l1_write(true);
+        }
+        // Record FU utilization for stores
+        stats_.record_fu_issued(OpcodeType::Store, lat);
     }
 
     return {};
@@ -425,6 +464,14 @@ Result<void> CPUEmulator::commit() {
 
         // Track retire stage for visualization
         visualization_->pipeline_tracker().record_retire(id, current_cycle_);
+
+        // Record branch prediction stats
+        if (is_branch(instr.opcode_type) && instr.branch_info.has_value()) {
+            const auto& bi = instr.branch_info.value();
+            // Simple prediction model: predict taken for conditional, not-taken for unconditional
+            bool predicted_taken = bi.is_conditional;
+            stats_.record_branch(bi.is_taken, predicted_taken, true, false);
+        }
 
         stats_.record_commit(instr, current_cycle_);
         trace_.record_commit(id, current_cycle_);

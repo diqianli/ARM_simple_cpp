@@ -113,6 +113,30 @@ struct CPUConfig {
         return c;
     }
 
+    /// GEM5 O3_ARM_v7a matching configuration
+    /// Matches configs/common/cores/arm/O3_ARM_v7a.py defaults:
+    ///   ROB=40, IQ=32, LQ=16, SQ=16, fetchWidth=3, issueWidth=8,
+    ///   commitWidth=8, ICache=32KB 2-way, DCache=32KB 2-way, L2=1MB 16-way
+    static CPUConfig gem5_o3_arm_v7a() {
+        auto c = default_config();
+        c.window_size = 40;        // ROB size
+        c.fetch_width = 3;         // fetchWidth
+        c.issue_width = 8;         // issueWidth
+        c.commit_width = 8;        // commitWidth
+        c.lsq_size = 32;           // LQ=16 + SQ=16
+        c.load_pipeline_count = 2;
+        c.store_pipeline_count = 2;
+        c.outstanding_requests = 16;
+        c.l1_size = 32 * 1024;     // 32 KB
+        c.l1_associativity = 2;    // 2-way
+        c.l1_hit_latency = 2;
+        c.l2_size = 1024 * 1024;   // 1 MB
+        c.l2_associativity = 16;   // 16-way
+        c.l2_hit_latency = 20;
+        // Note: GEM5 O3_ARM_v7a has no L3; our simulator requires L3, kept as default
+        return c;
+    }
+
     /// Validate configuration parameters
     Result<void> validate() const;
 
