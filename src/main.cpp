@@ -21,6 +21,7 @@
 #include <fstream>
 #include <cstdlib>
 #include <cstring>
+#include <iomanip>
 #include <iostream>
 #include <memory>
 #include <string>
@@ -267,165 +268,160 @@ arm_cpu::CPUConfig build_config(const CliArgs& args) {
     return config;
 }
 
-void print_json_metrics(const arm_cpu::PerformanceMetrics& m) {
-    std::printf(
-        "{\n"
-        "  \"total_instructions\": %llu,\n"
-        "  \"total_cycles\": %llu,\n"
-        "  \"ipc\": %.6f,\n"
-        "  \"cpi\": %.6f,\n"
-        "  \"l1_hit_rate\": %.6f,\n"
-        "  \"l2_hit_rate\": %.6f,\n"
-        "  \"l1_mpki\": %.6f,\n"
-        "  \"l2_mpki\": %.6f,\n"
-        "  \"memory_instr_pct\": %.6f,\n"
-        "  \"branch_instr_pct\": %.6f,\n"
-        "  \"avg_load_latency\": %.6f,\n"
-        "  \"avg_store_latency\": %.6f,\n",
-        static_cast<unsigned long long>(m.total_instructions),
-        static_cast<unsigned long long>(m.total_cycles),
-        m.ipc,
-        m.cpi,
-        m.l1_hit_rate,
-        m.l2_hit_rate,
-        m.l1_mpki,
-        m.l2_mpki,
-        m.memory_instr_pct,
-        m.branch_instr_pct,
-        m.avg_load_latency,
-        m.avg_store_latency
-    );
+/// Build the performance metrics JSON string (without the trailing closing brace).
+/// Returns the JSON text for all metric sections.
+std::string build_json_metrics_string(const arm_cpu::PerformanceMetrics& m) {
+    std::string json;
+    json.reserve(4096);
+
+    auto fmt_u64 = [](unsigned long long v) -> std::string {
+        return std::to_string(v);
+    };
+    auto fmt_f = [](double v, int prec = 6) -> std::string {
+        char buf[64];
+        std::snprintf(buf, sizeof(buf), "%.*f", prec, v);
+        return buf;
+    };
+
+    json += "{\n"
+        "  \"total_instructions\": " + fmt_u64(m.total_instructions) + ",\n"
+        "  \"total_cycles\": " + fmt_u64(m.total_cycles) + ",\n"
+        "  \"ipc\": " + fmt_f(m.ipc) + ",\n"
+        "  \"cpi\": " + fmt_f(m.cpi) + ",\n"
+        "  \"l1_hit_rate\": " + fmt_f(m.l1_hit_rate) + ",\n"
+        "  \"l2_hit_rate\": " + fmt_f(m.l2_hit_rate) + ",\n"
+        "  \"l1_mpki\": " + fmt_f(m.l1_mpki) + ",\n"
+        "  \"l2_mpki\": " + fmt_f(m.l2_mpki) + ",\n"
+        "  \"memory_instr_pct\": " + fmt_f(m.memory_instr_pct) + ",\n"
+        "  \"branch_instr_pct\": " + fmt_f(m.branch_instr_pct) + ",\n"
+        "  \"avg_load_latency\": " + fmt_f(m.avg_load_latency) + ",\n"
+        "  \"avg_store_latency\": " + fmt_f(m.avg_store_latency) + ",\n";
 
     // Instruction breakdown by opcode type
-    std::printf("  \"instructions\": {\n");
+    json += "  \"instructions\": {\n";
     bool first = true;
     for (const auto& [opcode, count] : m.instr_by_type) {
         if (count == 0) continue;
-        if (!first) std::printf(",\n");
+        if (!first) json += ",\n";
         first = false;
         double pct = (m.total_instructions > 0)
             ? static_cast<double>(count) / static_cast<double>(m.total_instructions) * 100.0
             : 0.0;
-        std::printf("    \"%.*s\": { \"count\": %llu, \"pct\": %.2f }",
-                     static_cast<int>(arm_cpu::opcode_to_string(opcode).size()),
-                     arm_cpu::opcode_to_string(opcode).data(),
-                     static_cast<unsigned long long>(count),
-                     pct);
+        json += "    \"" + std::string(arm_cpu::opcode_to_string(opcode)) +
+                "\": { \"count\": " + fmt_u64(count) +
+                ", \"pct\": " + fmt_f(pct, 2) + " }";
     }
-    if (!first) std::printf("\n");
-    std::printf("  },\n");
+    if (!first) json += "\n";
+    json += "  },\n";
 
     // Branch predictor metrics
     const auto& bs = m.branch_stats;
-    std::printf(
+    json +=
         "  \"branch_predictor\": {\n"
-        "    \"total_branches\": %llu,\n"
-        "    \"taken\": %llu,\n"
-        "    \"not_taken\": %llu,\n"
-        "    \"correct\": %llu,\n"
-        "    \"mispredictions\": %llu,\n"
-        "    \"accuracy\": %.2f,\n"
-        "    \"btb_hits\": %llu,\n"
-        "    \"btb_misses\": %llu,\n"
-        "    \"btb_hit_rate\": %.2f,\n"
-        "    \"ras_hits\": %llu,\n"
-        "    \"ras_misses\": %llu,\n"
-        "    \"squashes\": %llu,\n"
-        "    \"branch_mpki\": %.2f\n"
-        "  },\n",
-        static_cast<unsigned long long>(bs.branches),
-        static_cast<unsigned long long>(bs.taken),
-        static_cast<unsigned long long>(bs.not_taken),
-        static_cast<unsigned long long>(bs.correct_predictions),
-        static_cast<unsigned long long>(bs.mispredictions),
-        bs.accuracy() * 100.0,
-        static_cast<unsigned long long>(bs.btb_hits),
-        static_cast<unsigned long long>(bs.btb_misses),
-        bs.btb_hit_rate() * 100.0,
-        static_cast<unsigned long long>(bs.ras_hits),
-        static_cast<unsigned long long>(bs.ras_misses),
-        static_cast<unsigned long long>(bs.squashes),
-        bs.mpki(m.total_instructions)
-    );
+        "    \"total_branches\": " + fmt_u64(bs.branches) + ",\n"
+        "    \"taken\": " + fmt_u64(bs.taken) + ",\n"
+        "    \"not_taken\": " + fmt_u64(bs.not_taken) + ",\n"
+        "    \"correct\": " + fmt_u64(bs.correct_predictions) + ",\n"
+        "    \"mispredictions\": " + fmt_u64(bs.mispredictions) + ",\n"
+        "    \"accuracy\": " + fmt_f(bs.accuracy() * 100.0, 2) + ",\n"
+        "    \"btb_hits\": " + fmt_u64(bs.btb_hits) + ",\n"
+        "    \"btb_misses\": " + fmt_u64(bs.btb_misses) + ",\n"
+        "    \"btb_hit_rate\": " + fmt_f(bs.btb_hit_rate() * 100.0, 2) + ",\n"
+        "    \"ras_hits\": " + fmt_u64(bs.ras_hits) + ",\n"
+        "    \"ras_misses\": " + fmt_u64(bs.ras_misses) + ",\n"
+        "    \"squashes\": " + fmt_u64(bs.squashes) + ",\n"
+        "    \"branch_mpki\": " + fmt_f(bs.mpki(m.total_instructions), 2) + "\n"
+        "  },\n";
 
     // FU utilization
     const auto& fu = m.fu_stats;
-    std::printf(
+    json +=
         "  \"fu_utilization\": {\n"
-        "    \"int_alu_busy_cycles\": %llu,\n"
-        "    \"int_alu_issued\": %llu,\n"
-        "    \"int_mul_busy_cycles\": %llu,\n"
-        "    \"load_busy_cycles\": %llu,\n"
-        "    \"load_issued\": %llu,\n"
-        "    \"store_busy_cycles\": %llu,\n"
-        "    \"store_issued\": %llu,\n"
-        "    \"branch_busy_cycles\": %llu,\n"
-        "    \"branch_issued\": %llu,\n"
-        "    \"fp_simd_busy_cycles\": %llu,\n"
-        "    \"fp_simd_issued\": %llu,\n"
-        "    \"total_cycles\": %llu\n"
-        "  },\n",
-        static_cast<unsigned long long>(fu.int_alu_cycles),
-        static_cast<unsigned long long>(fu.int_alu_issued),
-        static_cast<unsigned long long>(fu.int_mul_cycles),
-        static_cast<unsigned long long>(fu.load_cycles),
-        static_cast<unsigned long long>(fu.load_issued),
-        static_cast<unsigned long long>(fu.store_cycles),
-        static_cast<unsigned long long>(fu.store_issued),
-        static_cast<unsigned long long>(fu.branch_cycles),
-        static_cast<unsigned long long>(fu.branch_issued),
-        static_cast<unsigned long long>(fu.fp_simd_cycles),
-        static_cast<unsigned long long>(fu.fp_simd_issued),
-        static_cast<unsigned long long>(fu.total_available_cycles)
-    );
+        "    \"int_alu_busy_cycles\": " + fmt_u64(fu.int_alu_cycles) + ",\n"
+        "    \"int_alu_issued\": " + fmt_u64(fu.int_alu_issued) + ",\n"
+        "    \"int_mul_busy_cycles\": " + fmt_u64(fu.int_mul_cycles) + ",\n"
+        "    \"load_busy_cycles\": " + fmt_u64(fu.load_cycles) + ",\n"
+        "    \"load_issued\": " + fmt_u64(fu.load_issued) + ",\n"
+        "    \"store_busy_cycles\": " + fmt_u64(fu.store_cycles) + ",\n"
+        "    \"store_issued\": " + fmt_u64(fu.store_issued) + ",\n"
+        "    \"branch_busy_cycles\": " + fmt_u64(fu.branch_cycles) + ",\n"
+        "    \"branch_issued\": " + fmt_u64(fu.branch_issued) + ",\n"
+        "    \"fp_simd_busy_cycles\": " + fmt_u64(fu.fp_simd_cycles) + ",\n"
+        "    \"fp_simd_issued\": " + fmt_u64(fu.fp_simd_issued) + ",\n"
+        "    \"total_cycles\": " + fmt_u64(fu.total_available_cycles) + "\n"
+        "  },\n";
 
     // Pipeline stalls
     const auto& st = m.stall_stats;
-    std::printf(
+    json +=
         "  \"pipeline_stalls\": {\n"
-        "    \"rob_full\": %llu,\n"
-        "    \"iq_full\": %llu,\n"
-        "    \"lsq_full\": %llu,\n"
-        "    \"cache_miss\": %llu,\n"
-        "    \"branch_mispredict\": %llu,\n"
-        "    \"total_stall_cycles\": %llu,\n"
-        "    \"issue_width_dist\": { \"0\": %llu, \"1\": %llu, \"2\": %llu, \"3\": %llu, \"4_plus\": %llu }\n"
-        "  },\n",
-        static_cast<unsigned long long>(st.rob_full_stalls),
-        static_cast<unsigned long long>(st.iq_full_stalls),
-        static_cast<unsigned long long>(st.lsq_full_stalls),
-        static_cast<unsigned long long>(st.cache_miss_stalls),
-        static_cast<unsigned long long>(st.branch_mispredict_stalls),
-        static_cast<unsigned long long>(st.total_stall_cycles),
-        static_cast<unsigned long long>(st.issue_width_dist[0]),
-        static_cast<unsigned long long>(st.issue_width_dist[1]),
-        static_cast<unsigned long long>(st.issue_width_dist[2]),
-        static_cast<unsigned long long>(st.issue_width_dist[3]),
-        static_cast<unsigned long long>(st.issue_width_dist[4])
-    );
+        "    \"rob_full\": " + fmt_u64(st.rob_full_stalls) + ",\n"
+        "    \"iq_full\": " + fmt_u64(st.iq_full_stalls) + ",\n"
+        "    \"lsq_full\": " + fmt_u64(st.lsq_full_stalls) + ",\n"
+        "    \"cache_miss\": " + fmt_u64(st.cache_miss_stalls) + ",\n"
+        "    \"branch_mispredict\": " + fmt_u64(st.branch_mispredict_stalls) + ",\n"
+        "    \"total_stall_cycles\": " + fmt_u64(st.total_stall_cycles) + ",\n"
+        "    \"issue_width_dist\": { \"0\": " + fmt_u64(st.issue_width_dist[0]) +
+        ", \"1\": " + fmt_u64(st.issue_width_dist[1]) +
+        ", \"2\": " + fmt_u64(st.issue_width_dist[2]) +
+        ", \"3\": " + fmt_u64(st.issue_width_dist[3]) +
+        ", \"4_plus\": " + fmt_u64(st.issue_width_dist[4]) + " }\n"
+        "  },\n";
 
     // Detailed cache metrics
     const auto& cd = m.cache_detail;
-    std::printf(
+    json +=
         "  \"cache_detail\": {\n"
-        "    \"l1\": { \"reads\": %llu, \"writes\": %llu, \"read_misses\": %llu, \"write_misses\": %llu, \"writebacks\": %llu, \"evictions\": %llu, \"avg_miss_latency\": %.2f },\n"
-        "    \"l2\": { \"reads\": %llu, \"writes\": %llu, \"read_misses\": %llu, \"write_misses\": %llu, \"writebacks\": %llu, \"evictions\": %llu, \"avg_miss_latency\": %.2f }\n"
-        "  }\n",
-        static_cast<unsigned long long>(cd.l1_reads),
-        static_cast<unsigned long long>(cd.l1_writes),
-        static_cast<unsigned long long>(cd.l1_read_misses),
-        static_cast<unsigned long long>(cd.l1_write_misses),
-        static_cast<unsigned long long>(cd.l1_writebacks),
-        static_cast<unsigned long long>(cd.l1_evictions),
-        cd.l1_avg_miss_latency,
-        static_cast<unsigned long long>(cd.l2_reads),
-        static_cast<unsigned long long>(cd.l2_writes),
-        static_cast<unsigned long long>(cd.l2_read_misses),
-        static_cast<unsigned long long>(cd.l2_write_misses),
-        static_cast<unsigned long long>(cd.l2_writebacks),
-        static_cast<unsigned long long>(cd.l2_evictions),
-        cd.l2_avg_miss_latency
-    );
+        "    \"l1\": { \"reads\": " + fmt_u64(cd.l1_reads) +
+        ", \"writes\": " + fmt_u64(cd.l1_writes) +
+        ", \"read_misses\": " + fmt_u64(cd.l1_read_misses) +
+        ", \"write_misses\": " + fmt_u64(cd.l1_write_misses) +
+        ", \"writebacks\": " + fmt_u64(cd.l1_writebacks) +
+        ", \"evictions\": " + fmt_u64(cd.l1_evictions) +
+        ", \"avg_miss_latency\": " + fmt_f(cd.l1_avg_miss_latency, 2) + " },\n"
+        "    \"l2\": { \"reads\": " + fmt_u64(cd.l2_reads) +
+        ", \"writes\": " + fmt_u64(cd.l2_writes) +
+        ", \"read_misses\": " + fmt_u64(cd.l2_read_misses) +
+        ", \"write_misses\": " + fmt_u64(cd.l2_write_misses) +
+        ", \"writebacks\": " + fmt_u64(cd.l2_writebacks) +
+        ", \"evictions\": " + fmt_u64(cd.l2_evictions) +
+        ", \"avg_miss_latency\": " + fmt_f(cd.l2_avg_miss_latency, 2) + " }\n"
+        "  }\n";
+
+    return json;
+}
+
+/// Helper: write profiling JSON to file. Returns the file path on success, empty on failure.
+std::string write_profiling_json(const std::string& stem,
+                                  const std::string& metrics_body,
+                                  double elapsed_ms,
+                                  double instr_per_sec,
+                                  double cycles_per_sec) {
+    // Determine output directory: output/profiling/
+    auto output_dir = std::filesystem::current_path() / "output" / "profiling";
+    if (!std::filesystem::exists(std::filesystem::current_path() / "output")) {
+        output_dir = std::filesystem::current_path() / ".." / "output" / "profiling";
+    }
+    std::filesystem::create_directories(output_dir);
+
+    // Timestamp: YYYYMMDD_HHMM
+    std::time_t now = std::time(nullptr);
+    std::tm local_tm;
+    localtime_r(&now, &local_tm);
+    char ts[20];
+    std::strftime(ts, sizeof(ts), "%Y%m%d_%H%M", &local_tm);
+
+    auto path = output_dir / (stem + "_" + ts + "_perf.json");
+    std::ofstream out(path);
+    if (!out.is_open()) return "";
+
+    out << metrics_body;
+    out << ",\n  \"wall_time_ms\": " << std::fixed << std::setprecision(3) << elapsed_ms << ",\n";
+    out << "  \"instr_per_sec\": " << std::fixed << std::setprecision(0) << instr_per_sec << ",\n";
+    out << "  \"cycles_per_sec\": " << cycles_per_sec << "\n";
+    out << "}\n";
+
+    return path.string();
 }
 
 int run_single(const CliArgs& args, int argc, char* argv[]) {
@@ -496,12 +492,20 @@ int run_single(const CliArgs& args, int argc, char* argv[]) {
         double cycles_per_sec = (elapsed_ms > 0) ? static_cast<double>(m.total_cycles) / (elapsed_ms / 1000.0) : 0.0;
 
         if (args.json_output) {
-            print_json_metrics(m);
+            auto metrics_body = build_json_metrics_string(m);
+            std::printf("%s", metrics_body.c_str());
             std::printf(",\n");
             std::printf("  \"wall_time_ms\": %.3f,\n", elapsed_ms);
             std::printf("  \"instr_per_sec\": %.0f,\n", instr_per_sec);
             std::printf("  \"cycles_per_sec\": %.0f\n", cycles_per_sec);
             std::printf("}\n");
+
+            // Write profiling JSON to file
+            auto stem = std::filesystem::path(args.trace_file).stem().string();
+            auto perf_path = write_profiling_json(stem, metrics_body, elapsed_ms, instr_per_sec, cycles_per_sec);
+            if (!perf_path.empty()) {
+                std::fprintf(stderr, "  Profiling: %s\n", perf_path.c_str());
+            }
         } else {
             std::cout << m.summary() << std::endl;
             std::fprintf(stderr, "\n--- Timing ---\n");
@@ -596,12 +600,20 @@ int run_single(const CliArgs& args, int argc, char* argv[]) {
         double cycles_per_sec = (elapsed_ms > 0) ? static_cast<double>(m.total_cycles) / (elapsed_ms / 1000.0) : 0.0;
 
         if (args.json_output) {
-            print_json_metrics(m);
+            auto metrics_body = build_json_metrics_string(m);
+            std::printf("%s", metrics_body.c_str());
             std::printf(",\n");
             std::printf("  \"wall_time_ms\": %.3f,\n", elapsed_ms);
             std::printf("  \"instr_per_sec\": %.0f,\n", instr_per_sec);
             std::printf("  \"cycles_per_sec\": %.0f\n", cycles_per_sec);
             std::printf("}\n");
+
+            // Write profiling JSON to file
+            auto stem = std::filesystem::path(args.trace_file).stem().string();
+            auto perf_path = write_profiling_json(stem, metrics_body, elapsed_ms, instr_per_sec, cycles_per_sec);
+            if (!perf_path.empty()) {
+                std::fprintf(stderr, "  Profiling: %s\n", perf_path.c_str());
+            }
         } else {
             std::cout << m.summary() << std::endl;
             std::fprintf(stderr, "\n--- Timing ---\n");

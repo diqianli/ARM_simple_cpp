@@ -3,13 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ARM CPU Emulator - Konata Visualization</title>
+    <title>ARM CPU Emulator - Visualization</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
     <div class="container">
         <header>
-            <h1>ARM CPU Emulator - Pipeline Visualization</h1>
+            <h1>ARM CPU Emulator - Visualization</h1>
             <div class="file-controls">
                 <label for="fileInput" class="btn btn-primary" id="loadJsonLabel">Load JSON File</label>
                 <input type="file" id="fileInput" accept=".json" style="position:fixed;left:-9999px;top:-9999px;">
@@ -32,29 +32,99 @@
             </div>
         </div>
 
+        <!-- Tab Navigation -->
+        <nav class="tab-navigation">
+            <button class="tab-btn active" data-tab="pipeline">Pipeline Timeline</button>
+            <button class="tab-btn" data-tab="stats">Performance Stats</button>
+        </nav>
+
         <!-- Drag-and-drop zone -->
         <div id="dropZone" class="drop-zone" style="display: none;">
             <div class="drop-icon">&#128194;</div>
-            <div class="drop-text">Drop a Konata JSON file here</div>
-            <div class="drop-hint">or click "Load JSON File" above</div>
+            <div class="drop-text">Drop a JSON file here</div>
+            <div class="drop-hint">Pipeline JSON or Performance Stats JSON</div>
         </div>
 
-        <!-- Main Konata Pipeline View -->
-        <section class="konata-section">
-            <h2>Konata Pipeline Visualization</h2>
-            <div id="pipelineViewContainer" class="pipeline-view-container"></div>
-        </section>
+        <!-- Pipeline Timeline Panel -->
+        <div id="pipeline-panel" class="tab-content active">
+            <section class="konata-section">
+                <h2>Konata Pipeline Visualization</h2>
+                <div id="pipelineViewContainer" class="pipeline-view-container"></div>
+            </section>
+        </div>
+
+        <!-- Performance Stats Panel -->
+        <div id="stats-panel" class="tab-content">
+            <div class="stats-load-zone">
+                <label for="statsFileInput" class="btn btn-primary">Load Performance Stats JSON</label>
+                <input type="file" id="statsFileInput" accept=".json" style="position:fixed;left:-9999px;top:-9999px;">
+                <span class="stats-load-hint">or drag-and-drop a performance stats JSON file</span>
+            </div>
+            <div class="stats-content" id="statsContent" style="display: none;">
+                <div class="stats-cards" id="statsCards"></div>
+                <div class="stats-charts">
+                    <div class="chart-card">
+                        <h3>Instruction Mix</h3>
+                        <canvas id="chartInstrMix"></canvas>
+                    </div>
+                    <div class="chart-card">
+                        <h3>Branch Prediction Accuracy</h3>
+                        <canvas id="chartBranchAcc"></canvas>
+                    </div>
+                    <div class="chart-card">
+                        <h3>BTB / RAS Hit Rate</h3>
+                        <canvas id="chartBtbRas"></canvas>
+                    </div>
+                    <div class="chart-card">
+                        <h3>Cache Hierarchy</h3>
+                        <canvas id="chartCache"></canvas>
+                    </div>
+                    <div class="chart-card chart-card-wide">
+                        <h3>Pipeline Stall Breakdown</h3>
+                        <canvas id="chartStalls"></canvas>
+                    </div>
+                    <div class="chart-card">
+                        <h3>Functional Unit Utilization</h3>
+                        <canvas id="chartFU"></canvas>
+                    </div>
+                    <div class="chart-card">
+                        <h3>Issue Width Distribution</h3>
+                        <canvas id="chartIssueWidth"></canvas>
+                    </div>
+                    <div class="chart-card chart-card-wide">
+                        <h3>CPI / IPC Overview</h3>
+                        <canvas id="chartIPC"></canvas>
+                    </div>
+                </div>
+                <div class="stats-table-wrap">
+                    <h3>Detailed Metrics</h3>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Metric</th>
+                                <th>Value</th>
+                            </tr>
+                        </thead>
+                        <tbody id="statsTableBody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
     </div>
 
     <div id="statusBar" class="status-bar">
         Ready. Loading visualization data...
     </div>
 
+    <!-- Chart.js for performance stats -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+
     <!-- Load Konata dependencies (relative paths for standalone use) -->
     <script src="konata/op.js"></script>
     <script src="konata/stage.js"></script>
     <script src="konata/konata_renderer.js"></script>
     <script src="pipeline_view.js"></script>
+    <script src="perf_stats_view.js"></script>
     <script src="app_static.js"></script>
 </body>
 </html>

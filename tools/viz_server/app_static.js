@@ -5,6 +5,7 @@
 class StaticVisualization {
     constructor() {
         this.pipelineView = null;
+        this.perfStatsView = null;
         this.data = null;
 
         // Default data file to try loading
@@ -30,14 +31,40 @@ class StaticVisualization {
         this.elements.fileInput.addEventListener('change', (e) => this.handleFileSelect(e));
         this.elements.reloadBtn.addEventListener('click', () => this.loadDefaultFile());
 
+        // Tab switching
+        this.initTabs();
+
         // Drag and drop support
         this.initDragDrop();
 
         // Initialize pipeline view
         this.initPipelineView();
 
+        // Initialize perf stats view
+        this.initPerfStatsView();
+
         // Try to load default file
         this.loadDefaultFile();
+    }
+
+    initTabs() {
+        document.querySelectorAll('.tab-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                // Update button states
+                document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+
+                // Update panel visibility
+                const tabId = btn.getAttribute('data-tab');
+                document.querySelectorAll('.tab-content').forEach(panel => {
+                    panel.classList.remove('active');
+                });
+                const targetPanel = document.getElementById(tabId + '-panel');
+                if (targetPanel) {
+                    targetPanel.classList.add('active');
+                }
+            });
+        });
     }
 
     initDragDrop() {
@@ -93,6 +120,15 @@ class StaticVisualization {
         });
 
         console.log('PipelineView initialized');
+    }
+
+    initPerfStatsView() {
+        if (typeof PerfStatsView !== 'undefined') {
+            this.perfStatsView = new PerfStatsView();
+            console.log('PerfStatsView initialized');
+        } else {
+            console.warn('PerfStatsView not loaded');
+        }
     }
 
     async loadDefaultFile() {
@@ -248,6 +284,45 @@ class StaticVisualization {
         this.loadFile(file);
     }
 
+    /**
+     * Detect JSON format and route to the correct handler.
+     * - Konata pipeline JSON: has "ops" array
+     * - Performance stats JSON: has "branch_predictor" object
+     */
+    detectAndRoute(data, fileName) {
+        if (data.ops && Array.isArray(data.ops)) {
+            // Konata pipeline JSON → render in pipeline tab
+            this.switchToTab('pipeline');
+            this.handleData(data);
+            this.updateStatus(`Loaded pipeline data: ${fileName}`);
+            return true;
+        }
+
+        if (data.branch_predictor) {
+            // Performance stats JSON → render in stats tab
+            this.switchToTab('stats');
+            if (this.perfStatsView) {
+                const name = fileName.replace(/\.json$/, '').replace(/_perf$/, '');
+                this.perfStatsView.render(data, name);
+            }
+            this.updateStatus(`Loaded performance stats: ${fileName}`);
+            return true;
+        }
+
+        return false;
+    }
+
+    switchToTab(tabId) {
+        document.querySelectorAll('.tab-btn').forEach(b => {
+            b.classList.toggle('active', b.getAttribute('data-tab') === tabId);
+        });
+        document.querySelectorAll('.tab-content').forEach(panel => {
+            panel.classList.remove('active');
+        });
+        const targetPanel = document.getElementById(tabId + '-panel');
+        if (targetPanel) targetPanel.classList.add('active');
+    }
+
     loadFile(file) {
         this.updateStatus(`Loading ${file.name}...`);
 
@@ -257,8 +332,11 @@ class StaticVisualization {
             reader.onload = (e) => {
                 try {
                     const data = JSON.parse(e.target.result);
-                    this.handleData(data);
-                    this.updateStatus(`Loaded ${file.name} successfully`);
+                    if (!this.detectAndRoute(data, file.name)) {
+                        // Fallback: try as pipeline data
+                        this.handleData(data);
+                        this.updateStatus(`Loaded ${file.name} successfully`);
+                    }
                 } catch (error) {
                     console.error('Failed to parse JSON:', error);
                     this.updateStatus(`Error: Failed to parse JSON - ${error.message}`);
@@ -269,7 +347,7 @@ class StaticVisualization {
             return;
         }
 
-        // For large files, stream-extract first N ops to avoid stack overflow
+        // For large files, assume Konata pipeline JSON (stream-extract ops)
         this.updateStatus(`Large file (${(file.size / 1024 / 1024).toFixed(1)} MB), extracting first 500 ops...`);
         const MAX_OPS = 500;
         const slice = file.slice(0, 10 * 1024 * 1024); // read first 10MB
@@ -314,6 +392,7 @@ class StaticVisualization {
                     ',"total_instructions":' + (metadata.total_instructions || 0) +
                     ',"version":"1.0"}';
                 const data = JSON.parse(fullJSON);
+                this.switchToTab('pipeline');
                 this.handleData(data);
                 this.updateStatus(`Loaded ${count} ops from ${file.name} (truncated from full dataset)`);
             } catch (error) {
