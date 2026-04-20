@@ -374,8 +374,26 @@ class KonataRenderer {
         this.renderGrid(ctx, layout);
         this.renderTimeline(ctx, layout);
         this.renderLabels(ctx, layout);
+
+        // Clip pipeline stages and dependencies to prevent overlap with label area
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(this.config.labelWidth, 0, this.width - this.config.labelWidth, this.height);
+        ctx.clip();
+
         this.renderOps(ctx, layout);
         this.renderDependencies(ctx, layout);
+
+        ctx.restore();
+
+        // Re-draw label separator on top to ensure clean border
+        ctx.strokeStyle = this.config.gridColor;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(this.config.labelWidth, 0);
+        ctx.lineTo(this.config.labelWidth, this.height);
+        ctx.stroke();
+        ctx.lineWidth = 1;
 
         // Render selection highlight
         if (this.selectedOp) {
