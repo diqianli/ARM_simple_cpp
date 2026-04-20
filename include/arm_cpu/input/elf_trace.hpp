@@ -29,7 +29,11 @@ class ElfTraceParser : public InstructionSource {
 public:
     /// Load and decode an ELF file.
     /// Returns an error if the file cannot be opened or is not a valid ARM64 ELF.
-    static Result<ElfTraceParser> from_file(const std::string& path);
+    /// When max_instructions > 0 and the trace is shorter, the trace will loop
+    /// to provide enough instructions for the simulation.
+    static Result<ElfTraceParser> from_file(
+        const std::string& path,
+        std::size_t max_instructions = 0);
 
     /// Reset to the beginning of the instruction stream.
     Result<void> reset() override;
@@ -45,6 +49,9 @@ private:
     std::vector<Instruction> instructions_;
     std::size_t cursor_ = 0;
     std::string file_path_;
+    bool loop_ = false;  // 是否循环回放 trace
+    uint64_t next_unique_id_ = 0;  // 循环回放时分配全局唯一 ID
+    std::size_t loop_count_ = 0;   // 已循环次数（0 = 首次遍历）
 };
 
 } // namespace arm_cpu

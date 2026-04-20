@@ -489,11 +489,16 @@ int run_single(const CliArgs& args, int argc, char* argv[]) {
         }
 
         // Wrap the InstructionSource in a functor for the engine
-        auto next_instr = [&source]() -> std::optional<Result<Instruction>> {
+        std::size_t fetched_count = 0;
+        auto next_instr = [&source, &fetched_count, max_instr = args.max_instructions]() -> std::optional<Result<Instruction>> {
+            if (max_instr > 0 && fetched_count >= max_instr) {
+                return std::nullopt;  // 达到指令上限，停止获取
+            }
             auto result = source->next();
             if (result.has_error()) return std::nullopt;
             auto opt = result.value();
             if (!opt.has_value()) return std::nullopt;
+            fetched_count++;
             return std::move(*opt);
         };
 
@@ -597,11 +602,16 @@ int run_single(const CliArgs& args, int argc, char* argv[]) {
         }
 
         // Wrap the InstructionSource in a functor for the emulator
-        auto next_instr = [&source]() -> std::optional<Result<Instruction>> {
+        std::size_t fetched_count = 0;
+        auto next_instr = [&source, &fetched_count, max_instr = args.max_instructions]() -> std::optional<Result<Instruction>> {
+            if (max_instr > 0 && fetched_count >= max_instr) {
+                return std::nullopt;  // 达到指令上限，停止获取
+            }
             auto result = source->next();
             if (result.has_error()) return std::nullopt;
             auto opt = result.value();
             if (!opt.has_value()) return std::nullopt;
+            fetched_count++;
             return std::move(*opt);
         };
 

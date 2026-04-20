@@ -17,7 +17,9 @@ namespace arm_cpu {
 // ElfTraceParser::from_file
 // =====================================================================
 
-Result<ElfTraceParser> ElfTraceParser::from_file(const std::string& path) {
+Result<ElfTraceParser> ElfTraceParser::from_file(
+    const std::string& path, std::size_t max_instructions)
+{
     // Step 1: Load ELF
     auto elf_result = ElfLoader::load(path);
     if (elf_result.has_error()) {
@@ -36,6 +38,11 @@ Result<ElfTraceParser> ElfTraceParser::from_file(const std::string& path) {
     // Step 2: Run functional simulation to generate dynamic trace
     // This performs PC-based execution with perfect branch prediction.
     FunctionalSim::Config sim_config;
+    if (max_instructions > 0) {
+        sim_config.max_instructions = std::max(
+            sim_config.max_instructions,
+            static_cast<uint64_t>(max_instructions));
+    }
     auto trace_result = FunctionalSim::run(elf, sim_config);
     if (trace_result.has_error()) {
         return Err(EmulatorError::trace_parse(
@@ -49,7 +56,13 @@ Result<ElfTraceParser> ElfTraceParser::from_file(const std::string& path) {
             std::to_string(elf.entry_point())));
     }
 
-    return Ok(ElfTraceParser(std::move(instructions), path));
+    auto parser = ElfTraceParser(std::move(instructions), path);
+    // 如果用户要求更多指令但 trace 不足，启用循环回放
+    if (max_instructions > 0 && parser.instructions_.size() < max_instructions) {
+        parser.loop_ = true;
+        parser.next_unique_id_ = static_cast<uint64_t>(parser.instructions_.size());
+    }
+    return Ok(std::move(parser));
 }
 
 // =====================================================================
@@ -82,9 +95,19 @@ std::optional<std::size_t> ElfTraceParser::total_count() const {
 
 Result<std::optional<Instruction>> ElfTraceParser::next_impl() {
     if (cursor_ >= instructions_.size()) {
-        return Ok(std::optional<Instruction>{std::nullopt});
+        if (loop_ && !instructions_.empty()) {
+            cursor_ = 0;  // 循环回放
+            loop_count_++;
+        } else {
+            return Ok(std::optional<Instruction>{std::nullopt});
+        }
     }
-    return Ok(std::optional<Instruction>{instructions_[cursor_++]});
+    auto instr = instructions_[cursor_++];
+    if (loop_count_ > 0) {
+        // 循环回放时分配全局唯一 ID，避免与已提交指令的 ID 冲突
+        instr.id = InstructionId(next_unique_id_++);
+    }
+    return Ok(std::optional<Instruction>{std::move(instr)});
 }
 
 } // namespace arm_cpu

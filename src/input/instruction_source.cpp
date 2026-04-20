@@ -22,7 +22,8 @@ std::unique_ptr<InstructionSource> create_source(const TraceInputConfig& config)
             // Not yet implemented; fall through to text as default
             return std::make_unique<TextTraceParser>(TextTraceParser::from_file(config.file_path).value());
         case TraceFormat::Elf: {
-            auto result = ElfTraceParser::from_file(config.file_path);
+            auto result = ElfTraceParser::from_file(
+                config.file_path, config.max_instructions);
             if (result.has_error()) {
                 std::fprintf(stderr, "Error loading ELF: %s\n", result.error().message().c_str());
                 return nullptr;
