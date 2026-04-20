@@ -12,6 +12,7 @@
 #include <capstone/arm64.h>
 
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <algorithm>
 
@@ -379,15 +380,31 @@ uint64_t FunctionalSim::compute_mem_addr(const cs_insn* insn, int op_index,
     if (insn->detail->arm64.writeback) {
         *has_writeback = true;
         // For pre-index: addr = base + disp, writeback = addr
-        // For post-index: addr = base, writeback = base + disp
-        // Capstone encodes pre-index with disp, post-index differently
-        // We detect post-index by checking if op_str has "]!" pattern
-        // or if the immediate displacement indicates post-index behavior
-        if (op.mem.disp != 0 && op.mem.index == ARM64_REG_INVALID) {
-            // Likely pre-index: writeback = addr (base + disp)
-            *writeback_val = addr;
+        // For post-index: addr = base, writeback = base + offset
+        // Capstone reports disp=0 for post-index; parse offset from op_str
+
+        // Detect post-index by checking the assembly text: "], #" means post-index
+        // Pre-index:  e.g., "[sp, #-48]!" — has "]!" pattern
+        bool is_post_index = false;
+        int64_t post_index_offset = 0;
+        if (insn->op_str) {
+            const char* close_bracket = std::strchr(insn->op_str, ']');
+            if (close_bracket && (close_bracket[1] == ',' || close_bracket[1] == ' ')) {
+                is_post_index = true;
+                // Parse the offset after '#' in "], #0x30" or "], #-48"
+                const char* hash = std::strchr(close_bracket, '#');
+                if (hash) {
+                    post_index_offset = std::strtoll(hash + 1, nullptr, 0);
+                }
+            }
+        }
+
+        if (is_post_index) {
+            // Post-index: access at base address, writeback = base + offset
+            addr = base_val;
+            *writeback_val = base_val + post_index_offset;
         } else {
-            // Post-index or register offset with writeback
+            // Pre-index: access at base + disp, writeback = addr
             *writeback_val = addr;
         }
     }

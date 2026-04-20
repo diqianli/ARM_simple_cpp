@@ -160,6 +160,9 @@ public:
     /// Export all tracked Konata ops to a JSON file.
     bool export_all_konata_to_file(const std::string& path, bool pretty = false) const;
 
+    /// Export all tracked ops in Kanata log format (.knata).
+    bool export_kanata_log_to_file(const std::string& path) const;
+
     uint64_t current_cycle() const { return current_cycle_; }
     uint64_t committed_count() const { return committed_count_; }
 

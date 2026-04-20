@@ -2,6 +2,7 @@
 /// @brief Visualization state implementation.
 
 #include "arm_cpu/visualization/visualization_state.hpp"
+#include "arm_cpu/visualization/kanata_log_exporter.hpp"
 #include "arm_cpu/ooo/ooo_engine.hpp"
 #include "arm_cpu/stats/stats_collector.hpp"
 
@@ -111,6 +112,12 @@ bool VisualizationState::export_all_konata_to_file(const std::string& path, bool
     export_data.ops = std::move(ops);
     export_data.ops_count = export_data.ops.size();
     return export_data.write_to_file(path, pretty);
+}
+
+bool VisualizationState::export_kanata_log_to_file(const std::string& path) const {
+    auto ops = pipeline_tracker_.export_all_konata_ops();
+    if (ops.empty()) return false;
+    return KanataLogExporter::export_to_file(path, ops, current_cycle_, committed_count_);
 }
 
 std::vector<InstructionSnapshot> VisualizationState::collect_instructions(const OoOEngine& engine) const {
