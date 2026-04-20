@@ -64,49 +64,21 @@
                 <div class="stats-cards" id="statsCards"></div>
                 <div class="stats-charts">
                     <div class="chart-card">
-                        <h3>Instruction Mix</h3>
-                        <canvas id="chartInstrMix"></canvas>
+                        <h3>IPC Timeline</h3>
+                        <canvas id="chart-ipc"></canvas>
                     </div>
                     <div class="chart-card">
-                        <h3>Branch Prediction Accuracy</h3>
-                        <canvas id="chartBranchAcc"></canvas>
+                        <h3>Cache Miss Rate Timeline</h3>
+                        <canvas id="chart-cache-miss"></canvas>
                     </div>
                     <div class="chart-card">
-                        <h3>BTB / RAS Hit Rate</h3>
-                        <canvas id="chartBtbRas"></canvas>
+                        <h3>Branch Mispred Rate Timeline</h3>
+                        <canvas id="chart-branch-mp"></canvas>
                     </div>
                     <div class="chart-card">
-                        <h3>Cache Hierarchy</h3>
-                        <canvas id="chartCache"></canvas>
+                        <h3>Pipeline Stall Rate Timeline</h3>
+                        <canvas id="chart-stall"></canvas>
                     </div>
-                    <div class="chart-card chart-card-wide">
-                        <h3>Pipeline Stall Breakdown</h3>
-                        <canvas id="chartStalls"></canvas>
-                    </div>
-                    <div class="chart-card">
-                        <h3>Functional Unit Utilization</h3>
-                        <canvas id="chartFU"></canvas>
-                    </div>
-                    <div class="chart-card">
-                        <h3>Issue Width Distribution</h3>
-                        <canvas id="chartIssueWidth"></canvas>
-                    </div>
-                    <div class="chart-card chart-card-wide">
-                        <h3>CPI / IPC Overview</h3>
-                        <canvas id="chartIPC"></canvas>
-                    </div>
-                </div>
-                <div class="stats-table-wrap">
-                    <h3>Detailed Metrics</h3>
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>Metric</th>
-                                <th>Value</th>
-                            </tr>
-                        </thead>
-                        <tbody id="statsTableBody"></tbody>
-                    </table>
                 </div>
             </div>
         </div>

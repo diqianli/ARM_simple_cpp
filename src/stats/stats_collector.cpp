@@ -77,11 +77,6 @@ double PerformanceStats::ipc() const {
     return static_cast<double>(total_instructions) / static_cast<double>(total_cycles);
 }
 
-double PerformanceStats::cpi() const {
-    if (total_instructions == 0) return 0.0;
-    return static_cast<double>(total_cycles) / static_cast<double>(total_instructions);
-}
-
 void PerformanceStats::record_instruction(OpcodeType opcode_type) {
     total_instructions++;
     instr_by_type[opcode_type]++;
@@ -596,7 +591,6 @@ PerformanceMetrics StatsCollector::get_metrics() const {
     m.total_instructions = stats_.total_instructions;
     m.total_cycles = stats_.total_cycles;
     m.ipc = stats_.ipc();
-    m.cpi = stats_.cpi();
     m.l1_hit_rate = stats_.l1_stats.hit_rate();
     m.l2_hit_rate = stats_.l2_stats.hit_rate();
     m.l1_mpki = stats_.l1_stats.mpki(stats_.total_instructions);
@@ -629,6 +623,52 @@ void StatsCollector::reset() {
     l1_miss_count_ = 0;
     l2_miss_latency_total_ = 0;
     l2_miss_count_ = 0;
+    last_snapshot_ = CounterSnapshot{};
+    interval_samples_.clear();
+}
+
+void StatsCollector::sample_interval(uint64_t cycle) {
+    CounterSnapshot cur{
+        stats_.total_instructions,
+        stats_.total_cycles,
+        stats_.l1_stats.accesses,
+        stats_.l1_stats.misses,
+        branch_stats_.branches,
+        branch_stats_.mispredictions,
+        stall_stats_.total_stall_cycles
+    };
+
+    uint64_t delta_instr = cur.total_instructions - last_snapshot_.total_instructions;
+    uint64_t delta_cycles = cur.total_cycles - last_snapshot_.total_cycles;
+
+    if (delta_cycles == 0) return;
+
+    IntervalSample s;
+    s.cycle_start = last_snapshot_.total_cycles;
+    s.cycle_end = cur.total_cycles;
+    s.instructions = delta_instr;
+    s.cycles = delta_cycles;
+    s.ipc = static_cast<double>(delta_instr) / static_cast<double>(delta_cycles);
+
+    s.cache_accesses = cur.l1_accesses - last_snapshot_.l1_accesses;
+    s.cache_misses = cur.l1_misses - last_snapshot_.l1_misses;
+    s.cache_miss_rate = (s.cache_accesses > 0)
+        ? static_cast<double>(s.cache_misses) / static_cast<double>(s.cache_accesses) : 0.0;
+
+    s.branches = cur.branches - last_snapshot_.branches;
+    s.mispredictions = cur.mispredictions - last_snapshot_.mispredictions;
+    s.branch_mispred_rate = (s.branches > 0)
+        ? static_cast<double>(s.mispredictions) / static_cast<double>(s.branches) : 0.0;
+
+    s.stall_cycles = cur.stall_cycles - last_snapshot_.stall_cycles;
+    s.stall_rate = static_cast<double>(s.stall_cycles) / static_cast<double>(delta_cycles);
+
+    interval_samples_.push_back(s);
+    last_snapshot_ = cur;
+}
+
+const std::vector<IntervalSample>& StatsCollector::interval_samples() const {
+    return interval_samples_;
 }
 
 } // namespace arm_cpu

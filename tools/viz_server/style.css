@@ -765,14 +765,10 @@ h1 {
 .stats-card.c-stall .stats-card-value { color: #bc8cff; }
 
 .stats-charts {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
     margin-bottom: 24px;
-}
-
-@media (max-width: 860px) {
-    .stats-charts { grid-template-columns: 1fr; }
 }
 
 .chart-card {

@@ -270,7 +270,8 @@ arm_cpu::CPUConfig build_config(const CliArgs& args) {
 
 /// Build the performance metrics JSON string (without the trailing closing brace).
 /// Returns the JSON text for all metric sections.
-std::string build_json_metrics_string(const arm_cpu::PerformanceMetrics& m) {
+std::string build_json_metrics_string(const arm_cpu::PerformanceMetrics& m,
+                                     const std::vector<arm_cpu::IntervalSample>& time_series = {}) {
     std::string json;
     json.reserve(4096);
 
@@ -287,7 +288,6 @@ std::string build_json_metrics_string(const arm_cpu::PerformanceMetrics& m) {
         "  \"total_instructions\": " + fmt_u64(m.total_instructions) + ",\n"
         "  \"total_cycles\": " + fmt_u64(m.total_cycles) + ",\n"
         "  \"ipc\": " + fmt_f(m.ipc) + ",\n"
-        "  \"cpi\": " + fmt_f(m.cpi) + ",\n"
         "  \"l1_hit_rate\": " + fmt_f(m.l1_hit_rate) + ",\n"
         "  \"l2_hit_rate\": " + fmt_f(m.l2_hit_rate) + ",\n"
         "  \"l1_mpki\": " + fmt_f(m.l1_mpki) + ",\n"
@@ -387,6 +387,26 @@ std::string build_json_metrics_string(const arm_cpu::PerformanceMetrics& m) {
         ", \"evictions\": " + fmt_u64(cd.l2_evictions) +
         ", \"avg_miss_latency\": " + fmt_f(cd.l2_avg_miss_latency, 2) + " }\n"
         "  }\n";
+
+    // Time series data
+    json += "  ,\n  \"time_series\": {\n"
+        "    \"interval\": " + fmt_u64(arm_cpu::StatsCollector::kSampleInterval) + ",\n"
+        "    \"samples\": [\n";
+    for (std::size_t i = 0; i < time_series.size(); ++i) {
+        const auto& s = time_series[i];
+        json += "      {"
+            "\"cycle_start\": " + fmt_u64(s.cycle_start) + ", "
+            "\"cycle_end\": " + fmt_u64(s.cycle_end) + ", "
+            "\"ipc\": " + fmt_f(s.ipc) + ", "
+            "\"cache_miss_rate\": " + fmt_f(s.cache_miss_rate) + ", "
+            "\"branch_mispred_rate\": " + fmt_f(s.branch_mispred_rate) + ", "
+            "\"stall_rate\": " + fmt_f(s.stall_rate) +
+            "}";
+        if (i + 1 < time_series.size()) json += ",";
+        json += "\n";
+    }
+    json += "    ]\n"
+        "  }";
 
     return json;
 }
@@ -600,7 +620,7 @@ int run_single(const CliArgs& args, int argc, char* argv[]) {
         double cycles_per_sec = (elapsed_ms > 0) ? static_cast<double>(m.total_cycles) / (elapsed_ms / 1000.0) : 0.0;
 
         if (args.json_output) {
-            auto metrics_body = build_json_metrics_string(m);
+            auto metrics_body = build_json_metrics_string(m, cpu->stats().interval_samples());
             std::printf("%s", metrics_body.c_str());
             std::printf(",\n");
             std::printf("  \"wall_time_ms\": %.3f,\n", elapsed_ms);

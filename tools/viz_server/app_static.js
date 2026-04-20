@@ -287,7 +287,7 @@ class StaticVisualization {
     /**
      * Detect JSON format and route to the correct handler.
      * - Konata pipeline JSON: has "ops" array
-     * - Performance stats JSON: has "branch_predictor" object
+     * - Performance stats JSON: has "time_series" object
      */
     detectAndRoute(data, fileName) {
         if (data.ops && Array.isArray(data.ops)) {
@@ -298,7 +298,7 @@ class StaticVisualization {
             return true;
         }
 
-        if (data.branch_predictor) {
+        if (data.time_series) {
             // Performance stats JSON → render in stats tab
             this.switchToTab('stats');
             if (this.perfStatsView) {

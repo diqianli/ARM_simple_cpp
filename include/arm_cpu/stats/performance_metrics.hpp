@@ -96,6 +96,28 @@ struct DetailedCacheMetrics {
 };
 
 // =====================================================================
+// IntervalSample — per-interval performance sample for time series
+// =====================================================================
+struct IntervalSample {
+    uint64_t cycle_start = 0;
+    uint64_t cycle_end = 0;
+    uint64_t instructions = 0;
+    uint64_t cycles = 0;
+    double ipc = 0.0;
+
+    uint64_t cache_accesses = 0;
+    uint64_t cache_misses = 0;
+    double cache_miss_rate = 0.0;
+
+    uint64_t branches = 0;
+    uint64_t mispredictions = 0;
+    double branch_mispred_rate = 0.0;
+
+    uint64_t stall_cycles = 0;
+    double stall_rate = 0.0;
+};
+
+// =====================================================================
 // CacheMetrics — cache performance snapshot
 // =====================================================================
 struct CacheMetrics {
@@ -142,7 +164,6 @@ struct PerformanceMetrics {
     uint64_t total_instructions = 0;
     uint64_t total_cycles = 0;
     double ipc = 0.0;
-    double cpi = 0.0;
     double l1_hit_rate = 0.0;
     double l2_hit_rate = 0.0;
     double l1_mpki = 0.0;

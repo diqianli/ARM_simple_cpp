@@ -34,7 +34,6 @@ std::string PerformanceMetrics::summary() const {
         "Instructions: {}\n"
         "Cycles: {}\n"
         "IPC: {:.3}\n"
-        "CPI: {:.3}\n"
         "\n"
         "L1 Cache:\n"
         "  Hit Rate: {:.2}%\n"
@@ -52,7 +51,6 @@ std::string PerformanceMetrics::summary() const {
         total_instructions,
         total_cycles,
         ipc,
-        cpi,
         l1_hit_rate * 100.0,
         l1_mpki,
         l2_hit_rate * 100.0,

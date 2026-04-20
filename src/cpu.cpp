@@ -224,6 +224,9 @@ Result<PerformanceMetrics> CPUEmulator::run_with_limit(
         }
     }
 
+    // Final interval sample
+    stats_.sample_interval(current_cycle_);
+
     return get_metrics();
 }
 
@@ -486,6 +489,12 @@ void CPUEmulator::advance_cycle() {
     memory_->advance_cycle();
     chi_manager_->advance_cycle();
     stats_.record_cycles(1);
+
+    // Sample performance metrics every kSampleInterval cycles
+    if (stats_.stats().total_cycles > 0 &&
+        stats_.stats().total_cycles % StatsCollector::kSampleInterval == 0) {
+        stats_.sample_interval(current_cycle_);
+    }
 
     // Update visualization cycle counter
     visualization_->set_cycle(current_cycle_);

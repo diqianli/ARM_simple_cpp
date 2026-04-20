@@ -70,7 +70,6 @@ struct PerformanceStats {
     ExecutionMetrics exec_stats;
 
     double ipc() const;
-    double cpi() const;
     void record_instruction(OpcodeType opcode_type);
     void record_cycles(uint64_t cycles);
     uint64_t instr_count(OpcodeType opcode_type) const;
@@ -230,6 +229,14 @@ public:
     /// Reset all statistics
     void reset();
 
+    /// Sample current interval stats (call every kSampleInterval cycles)
+    void sample_interval(uint64_t cycle);
+
+    /// Get all recorded interval samples
+    const std::vector<IntervalSample>& interval_samples() const;
+
+    static constexpr uint64_t kSampleInterval = 1000;
+
 private:
     struct LatencyTracker {
         uint64_t count = 0;
@@ -266,6 +273,20 @@ private:
     uint64_t l1_miss_count_ = 0;
     uint64_t l2_miss_latency_total_ = 0;
     uint64_t l2_miss_count_ = 0;
+
+    // Per-interval sampling
+    struct CounterSnapshot {
+        uint64_t total_instructions = 0;
+        uint64_t total_cycles = 0;
+        uint64_t l1_accesses = 0;
+        uint64_t l1_misses = 0;
+        uint64_t branches = 0;
+        uint64_t mispredictions = 0;
+        uint64_t stall_cycles = 0;
+    };
+
+    CounterSnapshot last_snapshot_;
+    std::vector<IntervalSample> interval_samples_;
 };
 
 } // namespace arm_cpu
