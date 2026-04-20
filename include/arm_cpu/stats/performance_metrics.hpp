@@ -118,6 +118,16 @@ struct IntervalSample {
 };
 
 // =====================================================================
+// WallTimeSample — per-wall-clock-interval performance sample
+// =====================================================================
+struct WallTimeSample {
+    double wall_time_sec = 0.0;       // Wall-clock time from simulation start (seconds)
+    uint64_t total_instructions = 0;  // Cumulative committed instructions at this point
+    uint64_t total_cycles = 0;        // Cumulative simulation cycles at this point
+    double instr_per_sec = 0.0;       // Instructions/sec over this wall-clock interval
+};
+
+// =====================================================================
 // CacheMetrics — cache performance snapshot
 // =====================================================================
 struct CacheMetrics {

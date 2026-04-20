@@ -121,6 +121,15 @@ class PerfStatsView {
         this._renderTimeSeriesChart('chart-cache-miss', 'Cache Miss Rate', samples, 'cache_miss_rate', avgCacheMiss, this.PINK, '');
         this._renderTimeSeriesChart('chart-branch-mp', 'Branch Mispred Rate', samples, 'branch_mispred_rate', avgBranchMP, this.ORANGE, '');
         this._renderTimeSeriesChart('chart-stall', 'Pipeline Stall Rate', samples, 'stall_rate', avgStall, this.PURPLE, '');
+
+        // Simulation speed chart (wall-time based)
+        if (data.wall_time_series && data.wall_time_series.samples.length) {
+            const wts = data.wall_time_series.samples;
+            const labels = wts.map(s => s.wall_time_sec.toFixed(0) + 's');
+            const values = wts.map(s => s.instr_per_sec);
+            const avgSpeed = data.instr_per_sec || 0;
+            this._renderWallTimeChart('chart-sim-speed', 'Instructions/sec', labels, values, avgSpeed, this.CYAN);
+        }
     }
 
     // ===================== SUMMARY CARDS =====================
@@ -155,6 +164,16 @@ class PerfStatsView {
                     <div class="stats-card-label">Stall Rate</div>
                     <div class="stats-card-value">${stallRate.toFixed(1)}%</div>
                     <div class="stats-card-sub">${(stalls.total_stall_cycles || 0)} stall cycles / ${totalCycles} total</div>
+                </div>
+                <div class="stats-card c-ipc">
+                    <div class="stats-card-label">Total Instructions</div>
+                    <div class="stats-card-value">${(d.total_instructions || 0).toLocaleString()}</div>
+                    <div class="stats-card-sub">across ${(d.total_cycles || 0).toLocaleString()} cycles</div>
+                </div>
+                <div class="stats-card c-miss">
+                    <div class="stats-card-label">Total Simulation Time</div>
+                    <div class="stats-card-value">${((d.wall_time_ms || 0) / 1000).toFixed(2)}s</div>
+                    <div class="stats-card-sub">${(d.instr_per_sec || 0).toLocaleString(undefined, {maximumFractionDigits: 0})} instr/s avg</div>
                 </div>
             `;
         }
@@ -210,6 +229,63 @@ class PerfStatsView {
                         grid: { color: this.GRID },
                         ticks: { color: this.TICK, maxTicksLimit: 20 },
                         title: { display: true, text: 'Cycle (K)', color: this.TICK }
+                    },
+                    y: {
+                        grid: { color: this.GRID },
+                        ticks: { color: this.TICK },
+                        title: { display: true, text: label, color: this.TICK },
+                        beginAtZero: true
+                    }
+                },
+                plugins: this._commonPlugins()
+            }
+        });
+    }
+
+    // ===================== WALL TIME CHART =====================
+    _renderWallTimeChart(canvasId, label, labels, values, avgValue, color) {
+        const ctx = document.getElementById(canvasId);
+        if (!ctx || typeof Chart === 'undefined') return;
+
+        const avgLine = labels.map(() => avgValue);
+
+        this.charts[canvasId] = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: labels,
+                datasets: [
+                    {
+                        label: label + ' (per 1s interval)',
+                        data: values,
+                        backgroundColor: color + '99',
+                        borderColor: color,
+                        borderWidth: 1,
+                        borderRadius: 3
+                    },
+                    {
+                        label: label + ' (average)',
+                        data: avgLine,
+                        type: 'line',
+                        borderColor: 'rgba(139,148,158,0.6)',
+                        borderWidth: 1.5,
+                        borderDash: [8, 4],
+                        pointRadius: 0,
+                        pointHoverRadius: 0,
+                        fill: false
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                interaction: {
+                    mode: 'index',
+                    intersect: false
+                },
+                scales: {
+                    x: {
+                        grid: { color: this.GRID },
+                        ticks: { color: this.TICK },
+                        title: { display: true, text: 'Wall Time (s)', color: this.TICK }
                     },
                     y: {
                         grid: { color: this.GRID },

@@ -143,6 +143,9 @@ Result<PerformanceMetrics> CPUEmulator::run_with_limit(
     uint64_t start_cycle = current_cycle_;
     uint64_t stall_cycles = 0;
 
+    // Start wall-clock timer for periodic sampling
+    stats_.start_wall_timer();
+
     while (running_) {
         uint64_t committed_before = committed_count_;
 
@@ -495,6 +498,9 @@ void CPUEmulator::advance_cycle() {
         stats_.stats().total_cycles % StatsCollector::kSampleInterval == 0) {
         stats_.sample_interval(current_cycle_);
     }
+
+    // Sample wall-clock time if interval elapsed
+    stats_.sample_wall_time_if_needed();
 
     // Update visualization cycle counter
     visualization_->set_cycle(current_cycle_);

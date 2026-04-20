@@ -271,7 +271,8 @@ arm_cpu::CPUConfig build_config(const CliArgs& args) {
 /// Build the performance metrics JSON string (without the trailing closing brace).
 /// Returns the JSON text for all metric sections.
 std::string build_json_metrics_string(const arm_cpu::PerformanceMetrics& m,
-                                     const std::vector<arm_cpu::IntervalSample>& time_series = {}) {
+                                     const std::vector<arm_cpu::IntervalSample>& time_series = {},
+                                     const std::vector<arm_cpu::WallTimeSample>& wall_time_series = {}) {
     std::string json;
     json.reserve(4096);
 
@@ -407,6 +408,25 @@ std::string build_json_metrics_string(const arm_cpu::PerformanceMetrics& m,
     }
     json += "    ]\n"
         "  }";
+
+    // Wall time series data
+    if (!wall_time_series.empty()) {
+        json += ",\n  \"wall_time_series\": {\n"
+            "    \"sample_interval_sec\": 1.0,\n"
+            "    \"samples\": [\n";
+        for (std::size_t i = 0; i < wall_time_series.size(); ++i) {
+            const auto& s = wall_time_series[i];
+            json += "      {"
+                "\"wall_time_sec\": " + fmt_f(s.wall_time_sec, 1) + ", "
+                "\"total_instructions\": " + fmt_u64(s.total_instructions) + ", "
+                "\"total_cycles\": " + fmt_u64(s.total_cycles) + ", "
+                "\"instr_per_sec\": " + fmt_f(s.instr_per_sec, 0) +
+                "}";
+            if (i + 1 < wall_time_series.size()) json += ",";
+            json += "\n";
+        }
+        json += "    ]\n  }";
+    }
 
     return json;
 }
@@ -630,7 +650,7 @@ int run_single(const CliArgs& args, int argc, char* argv[]) {
         double cycles_per_sec = (elapsed_ms > 0) ? static_cast<double>(m.total_cycles) / (elapsed_ms / 1000.0) : 0.0;
 
         if (args.json_output) {
-            auto metrics_body = build_json_metrics_string(m, cpu->stats().interval_samples());
+            auto metrics_body = build_json_metrics_string(m, cpu->stats().interval_samples(), cpu->stats().wall_time_samples());
             std::printf("%s", metrics_body.c_str());
             std::printf(",\n");
             std::printf("  \"wall_time_ms\": %.3f,\n", elapsed_ms);

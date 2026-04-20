@@ -11,6 +11,7 @@
 #include "arm_cpu/stats/performance_metrics.hpp"
 #include "arm_cpu/types.hpp"
 
+#include <chrono>
 #include <cstdint>
 #include <cstddef>
 #include <deque>
@@ -235,6 +236,15 @@ public:
     /// Get all recorded interval samples
     const std::vector<IntervalSample>& interval_samples() const;
 
+    /// Start wall-clock timer (call before simulation loop)
+    void start_wall_timer();
+
+    /// Sample wall time if >= kWallSampleIntervalSec has elapsed since last sample
+    void sample_wall_time_if_needed();
+
+    /// Get all recorded wall-time samples
+    const std::vector<WallTimeSample>& wall_time_samples() const;
+
     static constexpr uint64_t kSampleInterval = 1000;
 
 private:
@@ -287,6 +297,14 @@ private:
 
     CounterSnapshot last_snapshot_;
     std::vector<IntervalSample> interval_samples_;
+
+    // Wall-clock time sampling
+    std::chrono::steady_clock::time_point wall_start_;
+    double last_wall_sample_sec_ = 0.0;
+    std::vector<WallTimeSample> wall_time_samples_;
+    uint64_t last_wall_instr_count_ = 0;
+
+    static constexpr double kWallSampleIntervalSec = 1.0;
 };
 
 } // namespace arm_cpu

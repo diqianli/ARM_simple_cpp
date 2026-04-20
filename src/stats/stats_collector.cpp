@@ -625,6 +625,9 @@ void StatsCollector::reset() {
     l2_miss_count_ = 0;
     last_snapshot_ = CounterSnapshot{};
     interval_samples_.clear();
+    wall_time_samples_.clear();
+    last_wall_sample_sec_ = 0.0;
+    last_wall_instr_count_ = 0;
 }
 
 void StatsCollector::sample_interval(uint64_t cycle) {
@@ -669,6 +672,40 @@ void StatsCollector::sample_interval(uint64_t cycle) {
 
 const std::vector<IntervalSample>& StatsCollector::interval_samples() const {
     return interval_samples_;
+}
+
+// =====================================================================
+// StatsCollector — Wall-clock time sampling
+// =====================================================================
+
+void StatsCollector::start_wall_timer() {
+    wall_start_ = std::chrono::steady_clock::now();
+    last_wall_sample_sec_ = 0.0;
+    last_wall_instr_count_ = 0;
+    wall_time_samples_.clear();
+}
+
+void StatsCollector::sample_wall_time_if_needed() {
+    auto now = std::chrono::steady_clock::now();
+    double elapsed = std::chrono::duration<double>(now - wall_start_).count();
+    if (elapsed < last_wall_sample_sec_ + kWallSampleIntervalSec) return;
+
+    WallTimeSample s;
+    s.wall_time_sec = elapsed;
+    s.total_instructions = stats_.total_instructions;
+    s.total_cycles = stats_.total_cycles;
+    double delta_sec = elapsed - last_wall_sample_sec_;
+    s.instr_per_sec = (delta_sec > 0)
+        ? static_cast<double>(s.total_instructions - last_wall_instr_count_) / delta_sec
+        : 0.0;
+
+    wall_time_samples_.push_back(s);
+    last_wall_sample_sec_ = elapsed;
+    last_wall_instr_count_ = s.total_instructions;
+}
+
+const std::vector<WallTimeSample>& StatsCollector::wall_time_samples() const {
+    return wall_time_samples_;
 }
 
 } // namespace arm_cpu
