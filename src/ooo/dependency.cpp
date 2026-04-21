@@ -18,10 +18,12 @@ std::vector<DependencyInfo> DependencyTracker::register_instruction(
         auto it = register_producers_.find(src_reg);
         if (it != register_producers_.end()) {
             auto producer_id = it->second;
-            if (producer_id != id && completed_instructions_.find(producer_id) == completed_instructions_.end()) {
-                add_dependency(producer_id, id);
-                deps_count++;
+            if (producer_id != id) {
                 dependencies.push_back({producer_id, false});
+                if (completed_instructions_.find(producer_id) == completed_instructions_.end()) {
+                    add_dependency(producer_id, id);
+                    deps_count++;
+                }
             }
         }
     }
@@ -31,10 +33,12 @@ std::vector<DependencyInfo> DependencyTracker::register_instruction(
         auto it = vreg_producers_.find(src_vreg);
         if (it != vreg_producers_.end()) {
             auto producer_id = it->second;
-            if (producer_id != id && completed_instructions_.find(producer_id) == completed_instructions_.end()) {
-                add_dependency(producer_id, id);
-                deps_count++;
+            if (producer_id != id) {
                 dependencies.push_back({producer_id, false});
+                if (completed_instructions_.find(producer_id) == completed_instructions_.end()) {
+                    add_dependency(producer_id, id);
+                    deps_count++;
+                }
             }
         }
     }
@@ -44,10 +48,12 @@ std::vector<DependencyInfo> DependencyTracker::register_instruction(
         auto it = preg_producers_.find(src_preg);
         if (it != preg_producers_.end()) {
             auto producer_id = it->second;
-            if (producer_id != id && completed_instructions_.find(producer_id) == completed_instructions_.end()) {
-                add_dependency(producer_id, id);
-                deps_count++;
+            if (producer_id != id) {
                 dependencies.push_back({producer_id, false});
+                if (completed_instructions_.find(producer_id) == completed_instructions_.end()) {
+                    add_dependency(producer_id, id);
+                    deps_count++;
+                }
             }
         }
     }
@@ -58,10 +64,12 @@ std::vector<DependencyInfo> DependencyTracker::register_instruction(
         auto it = memory_producers_.find(addr);
         if (it != memory_producers_.end()) {
             auto producer_id = it->second;
-            if (producer_id != id && completed_instructions_.find(producer_id) == completed_instructions_.end()) {
-                add_memory_dependency(producer_id, id);
-                deps_count++;
+            if (producer_id != id) {
                 dependencies.push_back({producer_id, true});
+                if (completed_instructions_.find(producer_id) == completed_instructions_.end()) {
+                    add_memory_dependency(producer_id, id);
+                    deps_count++;
+                }
             }
         }
     }

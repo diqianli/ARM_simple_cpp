@@ -426,7 +426,7 @@ inline std::string_view opcode_to_string(OpcodeType op) {
 /// Execution latency in cycles (simplified model, inspired by Neoverse V2/N2)
 inline uint64_t latency(OpcodeType op) {
     switch (op) {
-        case OpcodeType::Mul: case OpcodeType::Div: return 3;
+        case OpcodeType::Mul: case OpcodeType::Div: return 2;
         case OpcodeType::Fadd: case OpcodeType::Fsub: return 2;
         case OpcodeType::Fmul: return 3;
         case OpcodeType::Fdiv: return 8;

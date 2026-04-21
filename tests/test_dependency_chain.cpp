@@ -439,3 +439,229 @@ TEST(DependencyChain, MultipleConfigsNoViolations) {
             << violations.size() << " dependency chain violation(s) with " << name << " config";
     }
 }
+
+// =====================================================================
+// E. Completed-producer dependency edge preservation tests
+//
+// These tests specifically exercise the code path in
+// DependencyTracker::register_instruction() where a producer has
+// already finished execution (is in completed_instructions_) when
+// the consumer instruction is dispatched.
+//
+// Design: N independent instructions (ADD Xi, X28, X29) followed by
+// M dependent instructions (ADD X(N+j), Xj, X28). With fetch_width=8
+// and issue_width>=2, the first batch completes before dependents are
+// dispatched, triggering the completed_instructions_ path.
+//
+// Timeline (default_config, issue=4):
+//   Cycle 0: dispatch ids 0-7, issue 4 (0-3), execute
+//   Cycle 1: complete 0-3, dispatch ids 8-15, issue 4-7
+//   Cycle 2: complete 4-7, dispatch ids 16+ (dependent)
+//            → ids 0-7 are in completed_instructions_
+//            → OLD BUG: dependencies.push_back() inside check → edge LOST
+//            → NEW FIX: dependencies.push_back() outside check → edge preserved
+// =====================================================================
+
+namespace {
+
+std::string build_completed_producer_trace(
+    std::size_t num_independent, std::size_t num_dependent)
+{
+    auto tmp = std::filesystem::temp_directory_path() / "completed_producer_trace.txt";
+    std::ofstream f(tmp);
+    uint64_t pc = 0x400000;
+    // Independent instructions: ADD Xi, X28, X29 (X28/X29 never written)
+    for (std::size_t i = 0; i < num_independent; ++i) {
+        f << std::format("0x{:x}: ADD X{}, X28, X29\n", pc, i);
+        pc += 4;
+    }
+    // Dependent instructions: ADD X(N+j), Xj, X28 (reads register written by id j)
+    for (std::size_t j = 0; j < num_dependent; ++j) {
+        f << std::format("0x{:x}: ADD X{}, X{}, X28\n", pc, num_independent + j, j);
+        pc += 4;
+    }
+    return tmp.string();
+}
+
+/// Count how many expected (consumer_id, producer_id) edges are missing
+/// from the KonataOps' prods lists.
+std::size_t count_missing_dep_edges(
+    const std::vector<KonataOp>& ops,
+    const std::vector<std::pair<uint64_t, uint64_t>>& expected_edges)
+{
+    std::unordered_map<uint64_t, const KonataOp*> id_map;
+    for (const auto& op : ops) id_map[op.id] = &op;
+
+    std::size_t missing = 0;
+    for (const auto& [consumer_id, producer_id] : expected_edges) {
+        auto it = id_map.find(consumer_id);
+        if (it == id_map.end()) { ++missing; continue; }
+        bool found = false;
+        for (const auto& dep : it->second->prods) {
+            if (dep.producer_id == producer_id) { found = true; break; }
+        }
+        if (!found) ++missing;
+    }
+    return missing;
+}
+
+/// Print detailed diagnostics for missing edges.
+void report_missing_edges(
+    const std::vector<KonataOp>& ops,
+    const std::vector<std::pair<uint64_t, uint64_t>>& expected_edges,
+    std::size_t num_independent)
+{
+    std::unordered_map<uint64_t, const KonataOp*> id_map;
+    for (const auto& op : ops) id_map[op.id] = &op;
+
+    for (const auto& [consumer_id, producer_id] : expected_edges) {
+        auto it = id_map.find(consumer_id);
+        if (it == id_map.end()) {
+            ADD_FAILURE() << "Consumer id=" << consumer_id << " not found in KonataOps";
+            continue;
+        }
+        bool found = false;
+        for (const auto& dep : it->second->prods) {
+            if (dep.producer_id == producer_id) { found = true; break; }
+        }
+        if (!found) {
+            ADD_FAILURE()
+                << "Missing dependency edge: consumer id=" << consumer_id
+                << " (ADD X" << consumer_id << ", X" << producer_id << ", X28)"
+                << " should depend on producer id=" << producer_id
+                << " (ADD X" << producer_id << ", X28, X29). "
+                << "Consumer has " << it->second->prods.size() << " prods entries.";
+        }
+    }
+}
+
+} // anonymous namespace
+
+TEST(DependencyChain, CompletedProducerEdgesPreserved_DefaultConfig) {
+    constexpr std::size_t kIndep = 16;
+    constexpr std::size_t kDep = 4;
+    auto path = build_completed_producer_trace(kIndep, kDep);
+    auto result = run_text_trace_viz(path, CPUConfig::default_config());
+    std::filesystem::remove(path);
+    ASSERT_TRUE(result.ok) << result.error;
+
+    // Consumers (ids 16-19) must each have a dep edge to producers (ids 0-3)
+    std::vector<std::pair<uint64_t, uint64_t>> expected;
+    for (std::size_t j = 0; j < kDep; ++j) {
+        expected.emplace_back(kIndep + j, j);
+    }
+
+    auto missing = count_missing_dep_edges(result.ops, expected);
+    if (missing > 0) {
+        report_missing_edges(result.ops, expected, kIndep);
+    }
+    EXPECT_EQ(missing, 0u)
+        << missing << " dependency edge(s) missing: consumers 16-19 should have "
+        << "edges to producers 0-3 which completed before consumers were dispatched";
+}
+
+TEST(DependencyChain, CompletedProducerEdgesPreserved_HighPerfConfig) {
+    constexpr std::size_t kIndep = 16;
+    constexpr std::size_t kDep = 4;
+    auto path = build_completed_producer_trace(kIndep, kDep);
+    auto result = run_text_trace_viz(path, CPUConfig::high_performance());
+    std::filesystem::remove(path);
+    ASSERT_TRUE(result.ok) << result.error;
+
+    std::vector<std::pair<uint64_t, uint64_t>> expected;
+    for (std::size_t j = 0; j < kDep; ++j) {
+        expected.emplace_back(kIndep + j, j);
+    }
+
+    auto missing = count_missing_dep_edges(result.ops, expected);
+    if (missing > 0) {
+        report_missing_edges(result.ops, expected, kIndep);
+    }
+    EXPECT_EQ(missing, 0u)
+        << missing << " dependency edge(s) missing with high_performance config";
+}
+
+TEST(DependencyChain, CompletedProducerEdgesPreserved_AllConfigs) {
+    constexpr std::size_t kIndep = 16;
+    constexpr std::size_t kDep = 4;
+    auto path = build_completed_producer_trace(kIndep, kDep);
+
+    std::vector<std::pair<std::string, CPUConfig>> configs = {
+        {"minimal",          CPUConfig::minimal()},
+        {"default",          CPUConfig::default_config()},
+        {"high_performance", CPUConfig::high_performance()},
+        {"gem5_o3",          CPUConfig::gem5_o3_arm_v7a()},
+    };
+
+    for (const auto& [name, config] : configs) {
+        SCOPED_TRACE("Config: " + name);
+        auto result = run_text_trace_viz(path, config);
+        ASSERT_TRUE(result.ok) << result.error;
+
+        std::vector<std::pair<uint64_t, uint64_t>> expected;
+        for (std::size_t j = 0; j < kDep; ++j) {
+            expected.emplace_back(kIndep + j, j);
+        }
+
+        auto missing = count_missing_dep_edges(result.ops, expected);
+        if (missing > 0) {
+            report_missing_edges(result.ops, expected, kIndep);
+        }
+        EXPECT_EQ(missing, 0u)
+            << missing << " dependency edge(s) missing with " << name << " config. "
+            << "This indicates dependency edges are lost when producers complete "
+            << "before consumers are dispatched.";
+    }
+
+    std::filesystem::remove(path);
+}
+
+TEST(DependencyChain, CompletedProducerNoChainViolations_WideConfig) {
+    // Even with completed producers, no execution/retire timing violations
+    constexpr std::size_t kIndep = 16;
+    constexpr std::size_t kDep = 4;
+    auto path = build_completed_producer_trace(kIndep, kDep);
+
+    for (const auto& [name, config] : std::vector<std::pair<std::string, CPUConfig>>{
+        {"default", CPUConfig::default_config()},
+        {"high_performance", CPUConfig::high_performance()},
+    }) {
+        SCOPED_TRACE("Config: " + name);
+        auto result = run_text_trace_viz(path, config);
+        ASSERT_TRUE(result.ok) << result.error;
+        ASSERT_GT(result.ops.size(), 0u);
+
+        auto violations = check_dependency_chain(result.ops);
+        report_violations(violations);
+        EXPECT_TRUE(violations.empty())
+            << violations.size() << " chain violation(s) with completed producers ("
+            << name << ")";
+    }
+
+    std::filesystem::remove(path);
+}
+
+TEST(DependencyChain, ManyCompletedProducerEdgesPreserved) {
+    // Larger scale: 32 independent + 8 dependent instructions
+    constexpr std::size_t kIndep = 32;
+    constexpr std::size_t kDep = 8;
+    auto path = build_completed_producer_trace(kIndep, kDep);
+    auto result = run_text_trace_viz(path, CPUConfig::default_config());
+    std::filesystem::remove(path);
+    ASSERT_TRUE(result.ok) << result.error;
+
+    // All 8 consumers should have edges to their respective producers
+    std::vector<std::pair<uint64_t, uint64_t>> expected;
+    for (std::size_t j = 0; j < kDep; ++j) {
+        expected.emplace_back(kIndep + j, j);
+    }
+
+    auto missing = count_missing_dep_edges(result.ops, expected);
+    if (missing > 0) {
+        report_missing_edges(result.ops, expected, kIndep);
+    }
+    EXPECT_EQ(missing, 0u)
+        << missing << " of " << kDep << " dependency edge(s) missing in 32+8 trace. "
+        << "With 32 independent instructions dispatched over 4 cycles, "
+        << "producers 0-7 are guaranteed to be completed before consumers 32-39 are dispatched.";
+}
