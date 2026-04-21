@@ -1,54 +1,41 @@
 #!/bin/bash
-# build.sh - 一键构建 ARM CPU 仿真器
+# build.sh - Build the ARM CPU emulator and run tests.
 #
-# 用法:
-#   ./scripts/build.sh              # Release 构建
-#   ./scripts/build.sh Debug        # Debug 构建
-#   ./scripts/build.sh -j8          # 指定并行数
+# Usage:
+#   ./scripts/build.sh            # Release build + tests
+#   ./scripts/build.sh Debug      # Debug build + tests
 
-set -e
+set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+BUILD_DIR="$PROJECT_ROOT/build"
+
+BUILD_TYPE="${1:-Release}"
+
+NPROC=$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4)
+
+echo "========================================="
+echo "  Building ARM CPU Emulator ($BUILD_TYPE)"
+echo "========================================="
 
 cd "$PROJECT_ROOT"
 
-# 检测并行数
-if [[ "$*" == *-j* ]]; then
-    PARALLEL=""
-else
-    NPROC=$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4)
-    PARALLEL="-j$NPROC"
-fi
+cmake -B build -DCMAKE_BUILD_TYPE="$BUILD_TYPE" 2>&1 | tail -3
+cmake --build build "-j$NPROC" 2>&1 | tail -5
 
-# 构建类型
-BUILD_TYPE="Release"
-for arg in "$@"; do
-    case "$arg" in
-        Debug|Release|RelWithDebInfo|MinSizeRel)
-            BUILD_TYPE="$arg"
-            ;;
-    esac
-done
+echo ""
+echo "构建成功"
 
+echo ""
+echo "运行测试..."
 echo "========================================="
-echo "  ARM CPU Emulator - 构建脚本"
-echo "  构建类型: $BUILD_TYPE"
-echo "  项目目录: $PROJECT_ROOT"
-echo "========================================="
-
-cmake -B build -DCMAKE_BUILD_TYPE="$BUILD_TYPE"
-cmake --build build $PARALLEL
-
-BINARY="$PROJECT_ROOT/build/arm_cpu_sim"
-if [ -f "$BINARY" ]; then
+cd "$BUILD_DIR"
+if ctest --output-on-failure; then
     echo ""
-    echo "构建成功: $BINARY"
-    echo ""
-    echo "快速测试:"
-    echo "  $BINARY --help"
-    echo "  $BINARY -f elf tests/data/test_elf_aarch64"
+    echo "所有测试通过"
 else
-    echo "Error: 构建产物未找到" >&2
+    echo ""
+    echo "测试失败！请检查上方错误信息。" >&2
     exit 1
 fi
