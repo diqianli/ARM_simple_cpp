@@ -307,11 +307,42 @@ Result<Instruction> TextTraceParser::parse_disassembly(uint64_t pc, std::string_
 
         for (std::size_t i = 0; i < operands.size(); ++i) {
             if (auto reg = parse_reg(operands[i])) {
-                if (i == 0 && !is_memory_op(opcode_type)) {
-                    instr.dst_regs.push_back(*reg);
+                if (i == 0) {
+                    // First operand: dst for non-store ops, src for store ops
+                    if (is_memory_op(opcode_type)) {
+                        if (is_store_op(opcode_type)) {
+                            if (!instr.src_regs.contains(*reg)) {
+                                instr.src_regs.push_back(*reg);
+                            }
+                        } else {
+                            instr.dst_regs.push_back(*reg);
+                        }
+                    } else {
+                        instr.dst_regs.push_back(*reg);
+                    }
                 } else {
                     if (!instr.src_regs.contains(*reg)) {
                         instr.src_regs.push_back(*reg);
+                    }
+                }
+            } else if (is_memory_op(opcode_type)) {
+                // Try to extract register from bracketed operand like "[X1", "[X1, #0]"
+                auto tok = operands[i];
+                // Strip leading '['
+                while (!tok.empty() && tok.front() == '[') tok.remove_prefix(1);
+                // Trim whitespace
+                while (!tok.empty() && std::isspace(static_cast<unsigned char>(tok.front()))) tok.remove_prefix(1);
+                // Strip trailing ']' and everything after
+                auto bracket_end = tok.find(']');
+                if (bracket_end != std::string_view::npos) tok = tok.substr(0, bracket_end);
+                // Strip leading '#' for immediate-only tokens (no register)
+                if (!tok.empty() && tok.front() == '#') continue;
+                // Try parsing what's left as a register (may have trailing " #" or whitespace)
+                auto reg_end = tok.find_first_of(" \t");
+                if (reg_end != std::string_view::npos) tok = tok.substr(0, reg_end);
+                if (auto base_reg = parse_reg(tok)) {
+                    if (!instr.src_regs.contains(*base_reg)) {
+                        instr.src_regs.push_back(*base_reg);
                     }
                 }
             }

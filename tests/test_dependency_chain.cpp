@@ -58,6 +58,31 @@ std::optional<uint64_t> get_stage_end_cycle(
 }
 
 // =====================================================================
+// Helper: get the effective execution/memory end cycle for an op
+// =====================================================================
+
+/// For compute ops this is the EX stage end; for memory ops this is the
+/// last ME (or ME:L1/L2/L3) stage end.  Returns nullopt if none found.
+std::optional<uint64_t> get_execution_end_cycle(const KonataOp& op) {
+    // Prefer explicit EX stage (compute ops)
+    auto ex_end = get_stage_end_cycle(op, "EX");
+    if (ex_end.has_value()) return ex_end;
+
+    // Memory ops use ME or ME:level sub-stages — take the latest one
+    std::optional<uint64_t> latest_me;
+    for (const auto& [lane_name, lane] : op.lanes) {
+        for (const auto& stage : lane.stages) {
+            if (stage.name == "ME" || stage.name.starts_with("ME:")) {
+                if (!latest_me.has_value() || stage.end_cycle > *latest_me) {
+                    latest_me = stage.end_cycle;
+                }
+            }
+        }
+    }
+    return latest_me;
+}
+
+// =====================================================================
 // Core: check dependency chain correctness
 // =====================================================================
 
@@ -87,18 +112,18 @@ std::vector<std::string> check_dependency_chain(
             const char* dep_type_str =
                 dep.dep_type == KonataDependencyType::Register ? "Register" : "Memory";
 
-            // --- Execute timing check ---
-            auto consumer_ex_end = get_stage_end_cycle(consumer, "EX");
-            auto producer_ex_end = get_stage_end_cycle(producer, "EX");
+            // --- Execution timing check (covers both EX and ME stages) ---
+            auto consumer_end = get_execution_end_cycle(consumer);
+            auto producer_end = get_execution_end_cycle(producer);
 
-            if (consumer_ex_end.has_value() && producer_ex_end.has_value()) {
-                if (*consumer_ex_end < *producer_ex_end) {
+            if (consumer_end.has_value() && producer_end.has_value()) {
+                if (*consumer_end < *producer_end) {
                     violations.push_back(std::format(
                         "Consumer [id={}] 0x{:x} {} executed before Producer [id={}] 0x{:x} {} "
-                        "(dep={}, consumer_ex_end={}, producer_ex_end={})",
+                        "(dep={}, consumer_end={}, producer_end={})",
                         consumer.id, consumer.pc, consumer.label_name,
                         producer.id, producer.pc, producer.label_name,
-                        dep_type_str, *consumer_ex_end, *producer_ex_end));
+                        dep_type_str, *consumer_end, *producer_end));
                 }
             }
 
@@ -293,7 +318,102 @@ TEST(DependencyChain, LoadStoreDependency) {
 }
 
 // =====================================================================
-// C. Multi-config tests
+// C. Dependency existence verification (ensure deps are actually recorded)
+// =====================================================================
+
+TEST(DependencyChain, DependenciesAreRecorded) {
+    // Verify that register RAW dependencies are actually recorded in KonataOps.
+    // ADD X0,X1,X2 -> ADD X3,X0,X4  must have a dependency edge.
+    auto tmp = std::filesystem::temp_directory_path() / "dep_exists_trace.txt";
+    {
+        std::ofstream f(tmp);
+        f << "0x400000: ADD X0, X1, X2\n";
+        f << "0x400004: ADD X3, X0, X4\n";
+    }
+
+    auto result = run_text_trace_viz(tmp.string());
+    std::filesystem::remove(tmp);
+    ASSERT_TRUE(result.ok) << result.error;
+    ASSERT_GE(result.ops.size(), 2u) << "Expected at least 2 KonataOps";
+
+    // The second instruction (consumer) must have at least one producer dependency
+    auto& consumer_op = result.ops[1];  // sorted by id
+    EXPECT_GE(consumer_op.prods.size(), 1u)
+        << "Consumer ADD X3,X0,X4 should have a dependency on producer ADD X0,X1,X2, "
+        << "but has " << consumer_op.prods.size() << " dependencies";
+}
+
+TEST(DependencyChain, LoadToUseDependencyRecorded) {
+    // LDR X0,[X1,#0] -> ADD X2,X0,X3  must have a register dependency
+    auto tmp = std::filesystem::temp_directory_path() / "load_dep_exists.txt";
+    {
+        std::ofstream f(tmp);
+        f << "0x400000: LDR X0, [X1, #0]\n";
+        f << "0x400004: ADD X2, X0, X3\n";
+    }
+
+    auto result = run_text_trace_viz(tmp.string());
+    std::filesystem::remove(tmp);
+    ASSERT_TRUE(result.ok) << result.error;
+    ASSERT_GE(result.ops.size(), 2u) << "Expected at least 2 KonataOps";
+
+    auto& consumer_op = result.ops[1];
+    bool has_dep = false;
+    for (const auto& d : consumer_op.prods) {
+        if (d.producer_id == result.ops[0].id) {
+            has_dep = true;
+            break;
+        }
+    }
+    EXPECT_TRUE(has_dep)
+        << "ADD X2,X0,X3 should depend on LDR X0,[X1,#0] via X0 register";
+}
+
+TEST(DependencyChain, DependencyTimingSanity) {
+    // For a chain of ADD instructions, verify that execution is sequential
+    // (each later instruction finishes no earlier than the previous).
+    auto tmp = std::filesystem::temp_directory_path() / "timing_sanity.txt";
+    {
+        std::ofstream f(tmp);
+        f << "0x400000: ADD X0, X1, X2\n";
+        f << "0x400004: ADD X3, X0, X4\n";
+        f << "0x400008: ADD X5, X3, X6\n";
+    }
+
+    auto result = run_text_trace_viz(tmp.string());
+    std::filesystem::remove(tmp);
+    ASSERT_TRUE(result.ok) << result.error;
+    ASSERT_GE(result.ops.size(), 3u) << "Expected at least 3 KonataOps";
+
+    // Each instruction's execution end should be >= previous instruction's execution end
+    for (std::size_t i = 1; i < result.ops.size(); ++i) {
+        auto prev_end = get_execution_end_cycle(result.ops[i - 1]);
+        auto curr_end = get_execution_end_cycle(result.ops[i]);
+        if (prev_end.has_value() && curr_end.has_value()) {
+            EXPECT_GE(*curr_end, *prev_end)
+                << "Instruction " << result.ops[i].label_name
+                << " (id=" << result.ops[i].id << ") ended at cycle " << *curr_end
+                << " but depends on " << result.ops[i-1].label_name
+                << " (id=" << result.ops[i-1].id << ") which ended at cycle " << *prev_end;
+        }
+    }
+
+    // Retire order must be sequential
+    for (std::size_t i = 1; i < result.ops.size(); ++i) {
+        auto prev_retire = result.ops[i - 1].retired_cycle;
+        auto curr_retire = result.ops[i].retired_cycle;
+        if (prev_retire.has_value() && curr_retire.has_value()) {
+            EXPECT_GE(*curr_retire, *prev_retire)
+                << "Instruction " << result.ops[i].label_name
+                << " retired at cycle " << *curr_retire
+                << " before " << result.ops[i-1].label_name
+                << " retired at cycle " << *prev_retire;
+        }
+    }
+}
+
+// =====================================================================
+// D. Multi-config tests
 // =====================================================================
 
 TEST(DependencyChain, MultipleConfigsNoViolations) {
