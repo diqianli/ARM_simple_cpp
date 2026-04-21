@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Visualization - ARM CPU Emulator Cookbook</title>
+    <link rel="stylesheet" href="../css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>body { font-family: 'Inter', var(--font-sans); }</style>
+</head>
+<body>
+
+<header class="site-header">
+    <a class="header-logo" href="../index.html">
+        <span class="logo-icon">&#x1F9E0;</span>
+        ARM CPU Emulator Cookbook
+    </a>
+    <div class="header-search">
+        <span class="search-icon">&#x1F50D;</span>
+        <input type="text" placeholder="Search docs... (Ctrl+K)" autocomplete="off">
+        <div class="search-results"></div>
+    </div>
+    <button class="menu-toggle" aria-label="Toggle menu">&#9776;</button>
+</header>
+
+<nav class="sidebar" id="sidebar">
+    <div class="nav-section">
+        <div class="nav-section-title">Part 1 &mdash; Usage Guide</div>
+        <a class="nav-item" href="../part1-usage/01-quick-start.html">1. Quick Start</a>
+        <a class="nav-item" href="../part1-usage/02-cli-reference.html">2. CLI Reference</a>
+        <a class="nav-item" href="../part1-usage/03-input-formats.html">3. Input Formats</a>
+        <a class="nav-item" href="../part1-usage/04-writing-test-programs.html">4. Writing Test Programs</a>
+        <a class="nav-item" href="../part1-usage/05-running-simulations.html">5. Running Simulations</a>
+        <a class="nav-item" href="../part1-usage/06-output-analysis.html">6. Output &amp; Analysis</a>
+        <a class="nav-item active" href="../part1-usage/07-visualization.html">7. Visualization</a>
+        <a class="nav-item" href="../part1-usage/08-configuration-presets.html">8. Configuration Presets</a>
+        <a class="nav-item" href="../part1-usage/09-benchmarks.html">9. Benchmarks</a>
+        <a class="nav-item" href="../part1-usage/10-automation-scripts.html">10. Automation Scripts</a>
+        <a class="nav-item" href="../part1-usage/11-faq.html">11. FAQ &amp; Troubleshooting</a>
+    </div>
+    <div class="nav-section">
+        <div class="nav-section-title">Part 2 &mdash; Architecture</div>
+        <a class="nav-item" href="../part2-architecture/01-system-overview.html">1. System Overview</a>
+        <a class="nav-item" href="../part2-architecture/02-cpu-pipeline.html">2. CPU Pipeline</a>
+        <a class="nav-item" href="../part2-architecture/03-ooo-engine.html">3. Out-of-Order Engine</a>
+        <a class="nav-item" href="../part2-architecture/04-instruction-decoder.html">4. Instruction Decoder</a>
+        <a class="nav-item" href="../part2-architecture/05-memory-hierarchy.html">5. Memory Hierarchy</a>
+        <a class="nav-item" href="../part2-architecture/06-elf-loader.html">6. ELF Loader</a>
+        <a class="nav-item" href="../part2-architecture/07-statistics.html">7. Statistics</a>
+        <a class="nav-item" href="../part2-architecture/08-visualization-system.html">8. Visualization System</a>
+        <a class="nav-item" href="../part2-architecture/09-chi-coherence.html">9. CHI Coherence</a>
+        <a class="nav-item" href="../part2-architecture/10-type-system.html">10. Type System</a>
+        <a class="nav-item" href="../part2-architecture/11-input-sources.html">11. Input Sources</a>
+        <a class="nav-item" href="../part2-architecture/12-gem5-comparison.html">12. GEM5 Comparison</a>
+    </div>
+</nav>
+
+<main class="main-content">
+    <div class="content-wrapper">
+
+        <div class="breadcrumb">
+            <a href="../index.html">Home</a>
+            <span class="sep">&rsaquo;</span>
+            <a href="../index.html">Usage Guide</a>
+            <span class="sep">&rsaquo;</span>
+            Visualization
+        </div>
+
+        <div class="page-header">
+            <h1>Visualization</h1>
+            <p class="page-desc">Explore the Konata pipeline timeline viewer to inspect instruction-level timing, pipeline stalls, and functional unit utilization.</p>
+        </div>
+
+        <h2>Konata Pipeline Viewer</h2>
+
+        <p>The simulator includes a Konata-style pipeline timeline viewer that renders per-instruction pipeline stage timing as an interactive, zoomable chart.</p>
+
+        <h3>Opening the Viewer</h3>
+
+        <p>There are two ways to access the visualization:</p>
+
+        <h4>Option A: Open the HTML file directly</h4>
+        <pre><code>file:///Users/mac/storage/clawbot/arm_cpu_emulator_cpp/tools/viz_server/index.html</code></pre>
+
+        <h4>Option B: Use the built-in web server</h4>
+        <pre><code>./build/arm_cpu_sim -f elf program.elf -p 3000</code></pre>
+        <p>Then open <code>http://localhost:3000</code> in your browser. The visualization page loads automatically with the output data served at the same address.</p>
+
+        <h3>Loading Data</h3>
+        <p>Use the file picker in the visualization interface to load an <code>output.json</code> file generated by the simulator.</p>
+
+        <h2>Timeline Features</h2>
+
+        <p>The pipeline timeline supports the following interactions:</p>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Action</th>
+                    <th>How</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>Zoom in/out</strong></td>
+                    <td>Mouse wheel or zoom buttons</td>
+                </tr>
+                <tr>
+                    <td><strong>Pan left/right</strong></td>
+                    <td>Click and drag on the timeline</td>
+                </tr>
+                <tr>
+                    <td><strong>Search instructions</strong></td>
+                    <td>Search by PC address to locate specific instructions</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>Color Coding by Instruction Type</h2>
+
+        <p>Instructions are color-coded by their type for quick visual identification:</p>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Color</th>
+                    <th>Category</th>
+                    <th>Examples</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><span style="color:#3b82f6;font-weight:bold;">Blue</span></td>
+                    <td>ALU operations</td>
+                    <td>ADD, SUB, MUL, AND, ORR, EOR</td>
+                </tr>
+                <tr>
+                    <td><span style="color:#22c55e;font-weight:bold;">Green</span></td>
+                    <td>Load operations</td>
+                    <td>LDR, LDP, LDUR, LDRB, LDRH</td>
+                </tr>
+                <tr>
+                    <td><span style="color:#f97316;font-weight:bold;">Orange</span></td>
+                    <td>Store operations</td>
+                    <td>STR, STP, STUR, STRB, STRH</td>
+                </tr>
+                <tr>
+                    <td><span style="color:#ef4444;font-weight:bold;">Red / Pink</span></td>
+                    <td>Branch operations</td>
+                    <td>B, BL, CBZ, CBNZ, TBZ, RET, BR</td>
+                </tr>
+                <tr>
+                    <td><span style="color:#a855f7;font-weight:bold;">Purple</span></td>
+                    <td>Floating Point / SIMD</td>
+                    <td>FADD, FSUB, FMUL, FADD (vector), SIMD ops</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>Pipeline Stages</h2>
+
+        <p>The timeline shows each instruction's progress through the pipeline stages:</p>
+
+        <div class="pipeline-diagram">
+            <span class="pipeline-stage" style="background:#3b82f6;">IF (Fetch)</span>
+            <span class="pipeline-arrow">&rarr;</span>
+            <span class="pipeline-stage" style="background:#8b5cf6;">DE (Decode)</span>
+            <span class="pipeline-arrow">&rarr;</span>
+            <span class="pipeline-stage" style="background:#a855f7;">RN (Rename)</span>
+            <span class="pipeline-arrow">&rarr;</span>
+            <span class="pipeline-stage" style="background:#d946ef;">DI (Dispatch)</span>
+            <span class="pipeline-arrow">&rarr;</span>
+            <span class="pipeline-stage" style="background:#ec4899;">IS (Issue)</span>
+            <span class="pipeline-arrow">&rarr;</span>
+            <span class="pipeline-stage" style="background:#f43f5e;">EX (Execute)</span>
+            <span class="pipeline-arrow">&rarr;</span>
+            <span class="pipeline-stage" style="background:#f97316;">ME (Memory)</span>
+            <span class="pipeline-arrow">&rarr;</span>
+            <span class="pipeline-stage" style="background:#eab308;">WB (Writeback)</span>
+            <span class="pipeline-arrow">&rarr;</span>
+            <span class="pipeline-stage" style="background:#22c55e;">RR (Retire)</span>
+        </div>
+
+        <ul>
+            <li><strong>IF (Fetch)</strong> &mdash; Instruction fetched from the instruction stream</li>
+            <li><strong>DE (Decode)</strong> &mdash; Instruction decoded and classified</li>
+            <li><strong>RN (Rename)</strong> &mdash; Register renaming to eliminate false dependencies</li>
+            <li><strong>DI (Dispatch)</strong> &mdash; Dispatched to the issue queue</li>
+            <li><strong>IS (Issue)</strong> &mdash; Issued to a functional unit when operands are ready</li>
+            <li><strong>EX (Execute)</strong> &mdash; Execution on the assigned functional unit</li>
+            <li><strong>ME (Memory)</strong> &mdash; Memory access (load/store instructions only)</li>
+            <li><strong>WB (Writeback)</strong> &mdash; Result written back to the register file</li>
+            <li><strong>RR (Retire)</strong> &mdash; Instruction commits in program order</li>
+        </ul>
+
+        <h2>Performance Metrics Panel</h2>
+
+        <p>The visualization page includes a metrics panel that displays:</p>
+        <ul>
+            <li><strong>IPC</strong> &mdash; Overall instructions per cycle</li>
+            <li><strong>Cache hit rates</strong> &mdash; L1, L2, L3 cache hit rates</li>
+            <li><strong>Branch prediction accuracy</strong> &mdash; Percentage of correctly predicted branches</li>
+            <li><strong>FU utilization</strong> &mdash; Breakdown of functional unit busy time by type</li>
+        </ul>
+
+        <h2>Alternative: Performance Stats View</h2>
+
+        <p>For a tabular metrics display, the <code>perf_stats_view.js</code> component provides a structured table view of performance statistics. This is useful when you need to compare numerical values directly rather than viewing the timeline.</p>
+
+        <h2>Kanata Log Export</h2>
+
+        <p>The simulator can export the execution trace in Kanata format for use with other visualization tools that support the Kanata log format. This is useful for cross-tool analysis and sharing results with collaborators who use different tooling.</p>
+
+        <div class="page-nav">
+            <a class="nav-prev" href="06-output-analysis.html">
+                <span class="nav-label">Prev</span>
+                <span class="nav-title">&larr; Output &amp; Analysis</span>
+            </a>
+            <a class="nav-next" href="08-configuration-presets.html">
+                <span class="nav-label">Next</span>
+                <span class="nav-title">Configuration Presets &rarr;</span>
+            </a>
+        </div>
+
+        <div class="content-footer">
+            ARM CPU Emulator Cookbook &mdash; Built with C++20, CMake, and a passion for computer architecture.
+        </div>
+    </div>
+</main>
+
+<script src="../js/main.js"></script>
+</body>
+</html>

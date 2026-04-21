@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GEM5 Comparison - ARM CPU Emulator Cookbook</title>
+    <link rel="stylesheet" href="../css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>body { font-family: 'Inter', var(--font-sans); }</style>
+</head>
+<body>
+
+<header class="site-header">
+    <a class="header-logo" href="../index.html">
+        <span class="logo-icon">&#x1F9E0;</span>
+        ARM CPU Emulator Cookbook
+    </a>
+    <div class="header-search">
+        <span class="search-icon">&#x1F50D;</span>
+        <input type="text" placeholder="Search docs... (Ctrl+K)" autocomplete="off">
+        <div class="search-results"></div>
+    </div>
+    <button class="menu-toggle" aria-label="Toggle menu">&#9776;</button>
+</header>
+
+<nav class="sidebar" id="sidebar">
+    <div class="nav-section">
+        <div class="nav-section-title">Part 1 &mdash; Usage Guide</div>
+        <a class="nav-item" href="../part1-usage/01-quick-start.html">1. Quick Start</a>
+        <a class="nav-item" href="../part1-usage/02-cli-reference.html">2. CLI Reference</a>
+        <a class="nav-item" href="../part1-usage/03-input-formats.html">3. Input Formats</a>
+        <a class="nav-item" href="../part1-usage/04-writing-test-programs.html">4. Writing Test Programs</a>
+        <a class="nav-item" href="../part1-usage/05-running-simulations.html">5. Running Simulations</a>
+        <a class="nav-item" href="../part1-usage/06-output-analysis.html">6. Output &amp; Analysis</a>
+        <a class="nav-item" href="../part1-usage/07-visualization.html">7. Visualization</a>
+        <a class="nav-item" href="../part1-usage/08-configuration-presets.html">8. Configuration Presets</a>
+        <a class="nav-item" href="../part1-usage/09-benchmarks.html">9. Benchmarks</a>
+        <a class="nav-item" href="../part1-usage/10-automation-scripts.html">10. Automation Scripts</a>
+        <a class="nav-item" href="../part1-usage/11-faq.html">11. FAQ &amp; Troubleshooting</a>
+    </div>
+    <div class="nav-section">
+        <div class="nav-section-title">Part 2 &mdash; Architecture</div>
+        <a class="nav-item" href="../part2-architecture/01-system-overview.html">1. System Overview</a>
+        <a class="nav-item" href="../part2-architecture/02-cpu-pipeline.html">2. CPU Pipeline</a>
+        <a class="nav-item" href="../part2-architecture/03-ooo-engine.html">3. Out-of-Order Engine</a>
+        <a class="nav-item" href="../part2-architecture/04-instruction-decoder.html">4. Instruction Decoder</a>
+        <a class="nav-item" href="../part2-architecture/05-memory-hierarchy.html">5. Memory Hierarchy</a>
+        <a class="nav-item" href="../part2-architecture/06-elf-loader.html">6. ELF Loader</a>
+        <a class="nav-item" href="../part2-architecture/07-statistics.html">7. Statistics</a>
+        <a class="nav-item" href="../part2-architecture/08-visualization-system.html">8. Visualization System</a>
+        <a class="nav-item" href="../part2-architecture/09-chi-coherence.html">9. CHI Coherence</a>
+        <a class="nav-item" href="../part2-architecture/10-type-system.html">10. Type System</a>
+        <a class="nav-item" href="../part2-architecture/11-input-sources.html">11. Input Sources</a>
+        <a class="nav-item active" href="../part2-architecture/12-gem5-comparison.html">12. GEM5 Comparison</a>
+    </div>
+</nav>
+
+<main class="main-content">
+    <div class="content-wrapper">
+
+        <div class="breadcrumb">
+            <a href="../index.html">Home</a>
+            <span class="sep">&rsaquo;</span>
+            <a href="../index.html">Architecture</a>
+            <span class="sep">&rsaquo;</span>
+            GEM5 Comparison
+        </div>
+
+        <div class="page-header">
+            <h1>GEM5 Comparison</h1>
+            <p class="page-desc">Cross-validation with the GEM5 simulator, including configuration alignment, comparison scripts, and known architectural differences.</p>
+        </div>
+
+        <p>The simulator can be configured to match GEM5's <code>O3_ARM_v7a</code> CPU model, enabling cross-validation of timing results between the two simulators. This is useful for verifying correctness and understanding where simplifications in our model affect accuracy.</p>
+
+        <h2>Configuration Alignment</h2>
+
+        <p>Use <code>--preset gem5_o3_arm_v7a</code> to align our simulator's parameters with GEM5 defaults:</p>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Parameter</th>
+                    <th>Our Simulator</th>
+                    <th>GEM5 O3_ARM_v7a</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>ROB Size</td>
+                    <td>40</td>
+                    <td>40</td>
+                </tr>
+                <tr>
+                    <td>Fetch Width</td>
+                    <td>3</td>
+                    <td>3</td>
+                </tr>
+                <tr>
+                    <td>Issue Width</td>
+                    <td>8</td>
+                    <td>8</td>
+                </tr>
+                <tr>
+                    <td>Commit Width</td>
+                    <td>8</td>
+                    <td>8</td>
+                </tr>
+                <tr>
+                    <td>Load Queue</td>
+                    <td>16</td>
+                    <td>16</td>
+                </tr>
+                <tr>
+                    <td>Store Queue</td>
+                    <td>16</td>
+                    <td>16</td>
+                </tr>
+                <tr>
+                    <td>ICache</td>
+                    <td>&mdash;</td>
+                    <td>32 KB, 2-way</td>
+                </tr>
+                <tr>
+                    <td>DCache</td>
+                    <td>32 KB, 2-way</td>
+                    <td>32 KB, 2-way</td>
+                </tr>
+                <tr>
+                    <td>L2 Cache</td>
+                    <td>1 MB, 16-way</td>
+                    <td>1 MB, 16-way</td>
+                </tr>
+                <tr>
+                    <td>L1 Hit Latency</td>
+                    <td>2 cycles</td>
+                    <td>~2 cycles</td>
+                </tr>
+                <tr>
+                    <td>L2 Hit Latency</td>
+                    <td>20 cycles</td>
+                    <td>~20 cycles</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <div class="callout callout-warning">
+            <div class="callout-title">Key structural differences</div>
+            <p>GEM5 O3_ARM_v7a has <strong>separate ICache and DCache</strong>; our simulator uses a <strong>unified L1</strong>. GEM5 has no L3 in this configuration; our simulator keeps the default L3. These differences affect cache contention modeling.</p>
+        </div>
+
+        <h2>Comparison Script</h2>
+
+        <p>The project includes a Python script <code>scripts/compare_gem5.py</code> that compares output from both simulators side by side:</p>
+
+        <pre><code>python3 scripts/compare_gem5.py \
+    --ours output.json \
+    --gem5 gem5_stats.txt</code></pre>
+
+        <h2>Comparison Dimensions</h2>
+
+        <p>The comparison script evaluates the following metrics:</p>
+        <ul>
+            <li><strong>Cycle count:</strong> Total simulated cycles to completion</li>
+            <li><strong>Instruction count:</strong> Total instructions executed</li>
+            <li><strong>IPC (Instructions Per Cycle):</strong> Overall throughput metric</li>
+            <li><strong>Execution time:</strong> Wall-clock time taken by each simulator</li>
+        </ul>
+
+        <h2>Known Differences</h2>
+
+        <h3>1. Branch Prediction</h3>
+        <p>Our simulator uses <code>FunctionalSim</code> (perfect prediction via pre-execution), while GEM5 uses a configurable branch predictor (default: tournament). This can cause significant IPC differences, as perfect prediction eliminates all branch misprediction penalties.</p>
+
+        <h3>2. Cache Model</h3>
+        <p>Our L1 cache is unified (instruction + data), while GEM5 has separate ICache and DCache. This affects cache contention modeling, as instruction fetches and data accesses compete for the same cache space in our model but are isolated in GEM5.</p>
+
+        <h3>3. L3 Cache</h3>
+        <p>Our simulator always includes an L3 cache in the hierarchy, while GEM5 O3_ARM_v7a does not configure an L3. This can lead to different miss rates and memory access patterns.</p>
+
+        <h3>4. Timing Granularity</h3>
+        <p>Our simulator uses integer cycle counting, while GEM5 may have sub-cycle timing for some operations. This can cause small discrepancies in cycle counts even when the overall behavior is similar.</p>
+
+        <h3>5. Memory Model</h3>
+        <p>Our DDR model includes row buffer timing and bank conflicts, while GEM5 uses a different memory timing model (typically <code>SimpleMemory</code> or <code>DRAMCtrl</code>). The detailed timing parameters may differ.</p>
+
+        <h3>6. Instruction Coverage</h3>
+        <p>Our Capstone-based decoder covers ~500 ARM64 mnemonics, while GEM5's ISA parser is more comprehensive. Rare or privileged instructions that Capstone cannot decode may be handled differently.</p>
+
+        <h2>Benchmark Programs with GEM5 Variants</h2>
+
+        <p>The <code>benchmarks/</code> directory includes <code>_gem5_se</code> variants of each benchmark, pre-configured for GEM5's SE (System-Emulation) mode. These allow direct comparison:</p>
+
+        <pre><code>benchmarks/dhrystone/dhrystone_gem5_se
+benchmarks/fibonacci/fibonacci_gem5_se
+benchmarks/matmul/matmul_gem5_se
+# ... and other benchmarks</code></pre>
+
+        <h2>Tips for Meaningful Comparison</h2>
+
+        <ol>
+            <li><strong>Use the same binary:</strong> Our <code>_aarch64</code> and <code>_gem5_se</code> variants are compiled from the same source, ensuring instruction-level equivalence.</li>
+            <li><strong>Set the same limits:</strong> Configure identical max instructions (<code>-n</code>) and max cycles (<code>-c</code>) limits in both simulators.</li>
+            <li><strong>Account for branch prediction:</strong> Our perfect branch prediction (via FunctionalSim) will typically show higher IPC than GEM5's tournament predictor. Focus on cache behavior for more comparable metrics.</li>
+            <li><strong>Compare cache metrics:</strong> Cache hit rates and MPKI (Misses Per Kilo Instructions) are more comparable between the two simulators than raw IPC, as they are less affected by branch prediction differences.</li>
+            <li><strong>Use the comparison script:</strong> Run <code>scripts/compare_gem5.py</code> for standardized output formatting and metric alignment.</li>
+        </ol>
+
+        <div class="page-nav">
+            <a class="nav-prev" href="11-input-sources.html">
+                <span class="nav-label">Prev</span>
+                <span class="nav-title">&larr; Input Sources</span>
+            </a>
+            <div></div>
+        </div>
+
+        <div class="content-footer">
+            ARM CPU Emulator Cookbook &mdash; Built with C++20, CMake, and a passion for computer architecture.
+        </div>
+    </div>
+</main>
+
+<script src="../js/main.js"></script>
+</body>
+</html>

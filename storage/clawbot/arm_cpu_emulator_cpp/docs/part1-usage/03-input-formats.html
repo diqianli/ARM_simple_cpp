@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Input Formats - ARM CPU Emulator Cookbook</title>
+    <link rel="stylesheet" href="../css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>body { font-family: 'Inter', var(--font-sans); }</style>
+</head>
+<body>
+
+<header class="site-header">
+    <a class="header-logo" href="../index.html">
+        <span class="logo-icon">&#x1F9E0;</span>
+        ARM CPU Emulator Cookbook
+    </a>
+    <div class="header-search">
+        <span class="search-icon">&#x1F50D;</span>
+        <input type="text" placeholder="Search docs... (Ctrl+K)" autocomplete="off">
+        <div class="search-results"></div>
+    </div>
+    <button class="menu-toggle" aria-label="Toggle menu">&#9776;</button>
+</header>
+
+<nav class="sidebar" id="sidebar">
+    <div class="nav-section">
+        <div class="nav-section-title">Part 1 &mdash; Usage Guide</div>
+        <a class="nav-item" href="../part1-usage/01-quick-start.html">1. Quick Start</a>
+        <a class="nav-item" href="../part1-usage/02-cli-reference.html">2. CLI Reference</a>
+        <a class="nav-item active" href="../part1-usage/03-input-formats.html">3. Input Formats</a>
+        <a class="nav-item" href="../part1-usage/04-writing-test-programs.html">4. Writing Test Programs</a>
+        <a class="nav-item" href="../part1-usage/05-running-simulations.html">5. Running Simulations</a>
+        <a class="nav-item" href="../part1-usage/06-output-analysis.html">6. Output &amp; Analysis</a>
+        <a class="nav-item" href="../part1-usage/07-visualization.html">7. Visualization</a>
+        <a class="nav-item" href="../part1-usage/08-configuration-presets.html">8. Configuration Presets</a>
+        <a class="nav-item" href="../part1-usage/09-benchmarks.html">9. Benchmarks</a>
+        <a class="nav-item" href="../part1-usage/10-automation-scripts.html">10. Automation Scripts</a>
+        <a class="nav-item" href="../part1-usage/11-faq.html">11. FAQ &amp; Troubleshooting</a>
+    </div>
+    <div class="nav-section">
+        <div class="nav-section-title">Part 2 &mdash; Architecture</div>
+        <a class="nav-item" href="../part2-architecture/01-system-overview.html">1. System Overview</a>
+        <a class="nav-item" href="../part2-architecture/02-cpu-pipeline.html">2. CPU Pipeline</a>
+        <a class="nav-item" href="../part2-architecture/03-ooo-engine.html">3. Out-of-Order Engine</a>
+        <a class="nav-item" href="../part2-architecture/04-instruction-decoder.html">4. Instruction Decoder</a>
+        <a class="nav-item" href="../part2-architecture/05-memory-hierarchy.html">5. Memory Hierarchy</a>
+        <a class="nav-item" href="../part2-architecture/06-elf-loader.html">6. ELF Loader</a>
+        <a class="nav-item" href="../part2-architecture/07-statistics.html">7. Statistics</a>
+        <a class="nav-item" href="../part2-architecture/08-visualization-system.html">8. Visualization System</a>
+        <a class="nav-item" href="../part2-architecture/09-chi-coherence.html">9. CHI Coherence</a>
+        <a class="nav-item" href="../part2-architecture/10-type-system.html">10. Type System</a>
+        <a class="nav-item" href="../part2-architecture/11-input-sources.html">11. Input Sources</a>
+        <a class="nav-item" href="../part2-architecture/12-gem5-comparison.html">12. GEM5 Comparison</a>
+    </div>
+</nav>
+
+<main class="main-content">
+    <div class="content-wrapper">
+
+        <div class="breadcrumb">
+            <a href="../index.html">Home</a>
+            <span class="sep">&rsaquo;</span>
+            <a href="../index.html">Usage Guide</a>
+            <span class="sep">&rsaquo;</span>
+            Input Formats
+        </div>
+
+        <div class="page-header">
+            <h1>Input Formats</h1>
+            <p class="page-desc">The simulator supports four input formats, each suited for different use cases ranging from full ARM64 binary execution to lightweight text traces.</p>
+        </div>
+
+        <h2>Format Comparison</h2>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Feature</th>
+                    <th>ELF</th>
+                    <th>Text</th>
+                    <th>ChampSim</th>
+                    <th>JSON</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>ISA Coverage</strong></td>
+                    <td>~500 mnemonics</td>
+                    <td>~40 mnemonics</td>
+                    <td>N/A (trace format)</td>
+                    <td>N/A (trace format)</td>
+                </tr>
+                <tr>
+                    <td><strong>Capstone Required</strong></td>
+                    <td><span class="badge badge-yellow">Yes</span></td>
+                    <td><span class="badge badge-green">No</span></td>
+                    <td><span class="badge badge-green">No</span></td>
+                    <td><span class="badge badge-green">No</span></td>
+                </tr>
+                <tr>
+                    <td><strong>Branch Prediction</strong></td>
+                    <td>Functional pre-sim</td>
+                    <td>None</td>
+                    <td>Trace-encoded</td>
+                    <td>N/A</td>
+                </tr>
+                <tr>
+                    <td><strong>Use Case</strong></td>
+                    <td>Full simulation</td>
+                    <td>Quick debugging</td>
+                    <td>Academic research</td>
+                    <td>Custom pipelines</td>
+                </tr>
+                <tr>
+                    <td><strong>CLI Flag</strong></td>
+                    <td><code>-f elf</code></td>
+                    <td><code>-f text</code></td>
+                    <td><code>-f champsim</code></td>
+                    <td><code>-f json</code></td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>ELF Format <span class="badge badge-green">Recommended</span></h2>
+
+        <p>The ELF format provides the most complete simulation experience. It loads a compiled ARM64 ELF binary and executes it through the full pipeline, decoding instructions via the Capstone v5 disassembler.</p>
+
+        <h3>Key Features</h3>
+        <ul>
+            <li><strong>Full ARM64 ISA coverage</strong> &mdash; approximately 500 mnemonics including ARMv8.0 through ARMv8.7-A extensions</li>
+            <li><strong>SVE and SME support</strong> &mdash; Scalable Vector Extension and Scalable Matrix Extension instructions</li>
+            <li><strong>Crypto extensions</strong> &mdash; AES, SHA1, SHA2, and CRC instructions</li>
+            <li><strong>Functional pre-simulation</strong> &mdash; the <code>FunctionalSim</code> component runs a fast functional simulation before the timing simulation to resolve branch targets, providing accurate branch prediction</li>
+            <li><strong>Symbol resolution</strong> &mdash; ELF symbol table is parsed for function boundary identification</li>
+            <li><strong>Static and dynamic linking</strong> &mdash; supports both statically linked and dynamically linked binaries</li>
+        </ul>
+
+        <h3>Usage</h3>
+        <pre><code># Run an ELF binary
+./build/arm_cpu_sim -f elf program.elf
+
+# With custom output and memory size
+./build/arm_cpu_sim -f elf program.elf -o result.json -m 512</code></pre>
+
+        <div class="callout callout-info">
+            <div class="callout-title">How it works</div>
+            <p>The ELF loader parses the binary headers, loads code and data sections into simulated memory, then Capstone v5 disassembles each instruction. A functional pre-simulation pass resolves all branch targets before the timing simulation begins, ensuring accurate pipeline behavior.</p>
+        </div>
+
+        <h2>Text Format</h2>
+
+        <p>The text format is a simple, human-readable instruction trace format. It is ideal for quick debugging, minimal testing, and cases where you do not want to depend on Capstone or a cross-compiler.</p>
+
+        <h3>ISA Coverage</h3>
+        <p>The text parser supports approximately 40 mnemonics covering the most common instruction categories:</p>
+        <ul>
+            <li><strong>Integer ALU</strong>: <code>ADD</code>, <code>SUB</code>, <code>MUL</code>, <code>AND</code>, <code>ORR</code>, <code>EOR</code>, <code>LSL</code>, <code>LSR</code>, <code>ASR</code>, <code>MOV</code>, <code>MVN</code>, <code>NEG</code></li>
+            <li><strong>Load/Store</strong>: <code>LDR</code>, <code>STR</code>, <code>LDP</code>, <code>STP</code>, <code>LDUR</code>, <code>STUR</code></li>
+            <li><strong>Branch</strong>: <code>B</code>, <code>BL</code>, <code>CBZ</code>, <code>CBNZ</code>, <code>B.EQ</code>, <code>B.NE</code>, <code>B.LT</code>, <code>B.GT</code>, <code>B.LE</code>, <code>B.GE</code>, <code>RET</code></li>
+            <li><strong>Basic FP</strong>: <code>FADD</code>, <code>FSUB</code>, <code>FMUL</code>, <code>FDIV</code></li>
+        </ul>
+
+        <h3>Line Format</h3>
+        <pre><code>OPCODE [dest,] src1[, src2]  [memory_addr]  [branch_target]</code></pre>
+
+        <h3>Example Text Trace</h3>
+        <pre><code>ADD X0, X1, X2
+SUB X3, X4, X5
+MUL X6, X7, X8
+AND X9, X10, X11
+ORR X12, X13, X14
+EOR X15, X16, X17
+LSL X18, X19, #3
+LSR X20, X21, #5
+MOV X22, X23
+LDR X0, [X1, #0]
+LDR W0, [X1, #4]
+STR X2, [X3, #8]
+LDP X4, X5, [X6, #16]
+STP X7, X8, [X9, #24]
+B label
+BL func
+CBZ X0, label
+CBNZ X0, label
+B.EQ target
+B.NE target
+FADD D0, D1, D2
+FSUB S0, S1, S2
+FMUL D3, D4, D5
+RET</code></pre>
+
+        <h3>Usage</h3>
+        <pre><code>./build/arm_cpu_sim -f text trace.txt -o result.json</code></pre>
+
+        <div class="callout callout-warning">
+            <div class="callout-title">No branch prediction in text mode</div>
+            <p>The text format does not include branch target information, so branch prediction is not available. All branches are resolved as-taken in the timing simulation. For accurate branch behavior, use the ELF format.</p>
+        </div>
+
+        <h2>ChampSim Format</h2>
+
+        <p>The ChampSim format is an academic trace format widely used in computer architecture research for cache and branch predictor evaluation. It encodes memory access patterns and branch outcomes as compact binary records.</p>
+
+        <h3>Variants</h3>
+        <ul>
+            <li><strong><code>champsim</code></strong> &mdash; Raw (uncompressed) ChampSim trace files</li>
+            <li><strong><code>champsim_xz</code></strong> &mdash; XZ-compressed ChampSim trace files (requires liblzma at build time)</li>
+        </ul>
+
+        <h3>Usage</h3>
+        <pre><code># Raw ChampSim trace
+./build/arm_cpu_sim -f champsim trace.champsim
+
+# XZ-compressed ChampSim trace
+./build/arm_cpu_sim -f champsim_xz trace.champsim.xz</code></pre>
+
+        <div class="callout callout-info">
+            <div class="callout-title">XZ compression dependency</div>
+            <p>The <code>champsim_xz</code> format requires the <code>liblzma</code> development library to be installed on the build system. On Ubuntu/Debian: <code>apt install liblzma-dev</code>. On macOS: <code>brew install xz</code>.</p>
+        </div>
+
+        <h2>JSON Format</h2>
+
+        <p>The JSON format accepts a pre-formatted instruction trace in JSON structure. This is useful for generating traces programmatically or converting from other simulation tools.</p>
+
+        <h3>Usage</h3>
+        <pre><code>./build/arm_cpu_sim -f json trace.json -o result.json</code></pre>
+
+        <h2>Choosing the Right Format</h2>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Scenario</th>
+                    <th>Recommended Format</th>
+                    <th>Reason</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Full program simulation with accurate pipeline behavior</td>
+                    <td><code>elf</code></td>
+                    <td>Complete ISA coverage, functional pre-simulation for branch targets</td>
+                </tr>
+                <tr>
+                    <td>Quick debugging or testing a specific instruction sequence</td>
+                    <td><code>text</code></td>
+                    <td>No cross-compiler or Capstone dependency needed, easy to hand-write</td>
+                </tr>
+                <tr>
+                    <td>Cache hierarchy or branch predictor research</td>
+                    <td><code>champsim</code></td>
+                    <td>Standard academic format, widely available trace corpora</td>
+                </tr>
+                <tr>
+                    <td>Custom trace generation from another tool</td>
+                    <td><code>json</code></td>
+                    <td>Structured format, easy to generate programmatically</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <div class="page-nav">
+            <a href="02-cli-reference.html">
+                <span class="nav-label">Previous</span>
+                <span class="nav-title">&larr; CLI Reference</span>
+            </a>
+            <a class="nav-next" href="04-writing-test-programs.html">
+                <span class="nav-label">Next</span>
+                <span class="nav-title">Writing Test Programs &rarr;</span>
+            </a>
+        </div>
+
+        <div class="content-footer">
+            ARM CPU Emulator Cookbook &mdash; Built with C++20, CMake, and a passion for computer architecture.
+        </div>
+    </div>
+</main>
+
+<script src="../js/main.js"></script>
+</body>
+</html>

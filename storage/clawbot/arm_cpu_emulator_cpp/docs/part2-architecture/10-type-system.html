@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Type System &amp; Data Structures - ARM CPU Emulator Cookbook</title>
+    <link rel="stylesheet" href="../css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>body { font-family: 'Inter', var(--font-sans); }</style>
+</head>
+<body>
+
+<header class="site-header">
+    <a class="header-logo" href="../index.html">
+        <span class="logo-icon">&#x1F9E0;</span>
+        ARM CPU Emulator Cookbook
+    </a>
+    <div class="header-search">
+        <span class="search-icon">&#x1F50D;</span>
+        <input type="text" placeholder="Search docs... (Ctrl+K)" autocomplete="off">
+        <div class="search-results"></div>
+    </div>
+    <button class="menu-toggle" aria-label="Toggle menu">&#9776;</button>
+</header>
+
+<nav class="sidebar" id="sidebar">
+    <div class="nav-section">
+        <div class="nav-section-title">Part 1 &mdash; Usage Guide</div>
+        <a class="nav-item" href="../part1-usage/01-quick-start.html">1. Quick Start</a>
+        <a class="nav-item" href="../part1-usage/02-cli-reference.html">2. CLI Reference</a>
+        <a class="nav-item" href="../part1-usage/03-input-formats.html">3. Input Formats</a>
+        <a class="nav-item" href="../part1-usage/04-writing-test-programs.html">4. Writing Test Programs</a>
+        <a class="nav-item" href="../part1-usage/05-running-simulations.html">5. Running Simulations</a>
+        <a class="nav-item" href="../part1-usage/06-output-analysis.html">6. Output &amp; Analysis</a>
+        <a class="nav-item" href="../part1-usage/07-visualization.html">7. Visualization</a>
+        <a class="nav-item" href="../part1-usage/08-configuration-presets.html">8. Configuration Presets</a>
+        <a class="nav-item" href="../part1-usage/09-benchmarks.html">9. Benchmarks</a>
+        <a class="nav-item" href="../part1-usage/10-automation-scripts.html">10. Automation Scripts</a>
+        <a class="nav-item" href="../part1-usage/11-faq.html">11. FAQ &amp; Troubleshooting</a>
+    </div>
+    <div class="nav-section">
+        <div class="nav-section-title">Part 2 &mdash; Architecture</div>
+        <a class="nav-item" href="../part2-architecture/01-system-overview.html">1. System Overview</a>
+        <a class="nav-item" href="../part2-architecture/02-cpu-pipeline.html">2. CPU Pipeline</a>
+        <a class="nav-item" href="../part2-architecture/03-ooo-engine.html">3. Out-of-Order Engine</a>
+        <a class="nav-item" href="../part2-architecture/04-instruction-decoder.html">4. Instruction Decoder</a>
+        <a class="nav-item" href="../part2-architecture/05-memory-hierarchy.html">5. Memory Hierarchy</a>
+        <a class="nav-item" href="../part2-architecture/06-elf-loader.html">6. ELF Loader</a>
+        <a class="nav-item" href="../part2-architecture/07-statistics.html">7. Statistics</a>
+        <a class="nav-item" href="../part2-architecture/08-visualization-system.html">8. Visualization System</a>
+        <a class="nav-item" href="../part2-architecture/09-chi-coherence.html">9. CHI Coherence</a>
+        <a class="nav-item active" href="../part2-architecture/10-type-system.html">10. Type System</a>
+        <a class="nav-item" href="../part2-architecture/11-input-sources.html">11. Input Sources</a>
+        <a class="nav-item" href="../part2-architecture/12-gem5-comparison.html">12. GEM5 Comparison</a>
+    </div>
+</nav>
+
+<main class="main-content">
+    <div class="content-wrapper">
+
+        <div class="breadcrumb">
+            <a href="../index.html">Home</a>
+            <span class="sep">&rsaquo;</span>
+            <a href="../index.html">Architecture</a>
+            <span class="sep">&rsaquo;</span>
+            Type System
+        </div>
+
+        <div class="page-header">
+            <h1>Type System &amp; Data Structures</h1>
+            <p class="page-desc">Core types, enums, and data structures used throughout the ARM CPU Emulator, including register definitions, instruction representation, and error handling.</p>
+        </div>
+
+        <p>All core types are defined in <code>include/arm_cpu/types.hpp</code> (732 lines). The file uses modern C++20 features including scoped enums, structs, <code>constexpr</code>, and concepts.</p>
+
+        <h2>Register Types</h2>
+
+        <p>The simulator models the ARM64 register files with strongly-typed enums:</p>
+
+        <pre><code class="language-cpp">// General purpose registers
+enum class Reg : uint8_t { X0, X1, ..., X28, X29, FP, LR, SP, XZR };
+
+// Vector/SIMD registers
+enum class VReg : uint8_t { V0, V1, ..., V31 };
+
+// Predicate registers (SVE)
+enum class PReg : uint8_t { P0, P1, ..., P15 };</code></pre>
+
+        <ul>
+            <li><strong>Reg:</strong> 31 general-purpose registers (X0&ndash;X30) plus frame pointer (FP/X29), link register (LR/X30), stack pointer (SP), and zero register (XZR).</li>
+            <li><strong>VReg:</strong> 32 128-bit SIMD/NEON registers (V0&ndash;V31).</li>
+            <li><strong>PReg:</strong> 16 predicate registers for SVE (P0&ndash;P15).</li>
+        </ul>
+
+        <h2>OpcodeType Enum (~80 entries)</h2>
+
+        <p>The central enum classifying every instruction the simulator recognizes. Grouped by functional category:</p>
+
+        <pre><code class="language-cpp">enum class OpcodeType : uint8_t {
+    // Integer ALU
+    Add, Sub, And, Or, Xor, Shift, Rotate, Neg, Not,
+    Mul, Mneg, Div, Udiv, Rem, Urem,
+    // Comparison
+    Cmp, Cmn, Tst,
+    // Move
+    Mov, Mvn, Movz, Movk,
+    // Load/Store
+    Load, Store, LoadPair, StorePair, LoadByte, StoreByte,
+    LoadHalf, StoreHalf, LoadSigned, Prefetch,
+    // Branch
+    Branch, BranchLink, BranchReg, CondBranch,
+    CompareBranch, TestBranch, Return, ExceptionReturn,
+    // Floating Point
+    FpAdd, FpSub, FpMul, FpDiv, FpSqrt,
+    FpCmp, FpConvert, FpRound,
+    // SIMD/NEON
+    SimdAdd, SimdSub, SimdMul, SimdShift, SimdCompare,
+    SimdLoad, SimdStore, SimdMove,
+    // SVE
+    SveAdd, SveSub, SveMul, SveLoad, SveStore,
+    // SME
+    SmeAdd, SmeMul, SmeLoad, SmeStore, SmeOuterProduct,
+    // Crypto
+    AesEncode, AesDecode, AesMix, AesMc,
+    Sha1Hash, Sha256Hash, Sha512Hash,
+    // System
+    Barrier, Nop, Sys, Msr, Mrs,
+    // Other
+    Unknown, Count
+};</code></pre>
+
+        <h2>Classification Functions</h2>
+
+        <p>Utility functions classify opcodes into categories, used by the pipeline scheduler and statistics collector:</p>
+
+        <pre><code class="language-cpp">bool is_memory_op(OpcodeType);   // Load, Store, LoadPair, StorePair, etc.
+bool is_branch(OpcodeType);      // Branch, BranchLink, CondBranch, etc.
+bool is_compute(OpcodeType);     // Add, Sub, Mul, etc.
+bool is_simd(OpcodeType);        // SimdAdd, SimdSub, etc.
+bool is_sve(OpcodeType);         // SveAdd, SveSub, etc.
+bool is_sme(OpcodeType);         // SmeAdd, SmeMul, etc.
+bool is_crypto(OpcodeType);      // AesEncode, Sha1Hash, etc.
+bool is_barrier(OpcodeType);     // Barrier</code></pre>
+
+        <h2>Instruction Struct (Builder Pattern)</h2>
+
+        <p>The central data structure representing a single instruction in the simulator pipeline. Uses a builder pattern for ergonomic construction:</p>
+
+        <pre><code class="language-cpp">struct Instruction {
+    uint64_t pc = 0;
+    OpcodeType opcode = OpcodeType::Unknown;
+    std::string mnemonic;
+
+    // Registers
+    StaticVector&lt;Reg, 4&gt; src_regs;
+    StaticVector&lt;Reg, 4&gt; dst_regs;
+    StaticVector&lt;VReg, 4&gt; src_vregs;
+    StaticVector&lt;VReg, 4&gt; dst_vregs;
+
+    // Memory
+    uint64_t mem_addr = 0;
+    std::size_t mem_size = 0;
+    bool is_load = false;
+    bool is_store = false;
+
+    // Branch
+    uint64_t branch_target = 0;
+    bool branch_taken = false;
+
+    // Builder methods
+    Instruction&amp; with_pc(uint64_t pc);
+    Instruction&amp; with_opcode(OpcodeType op);
+    Instruction&amp; with_src_reg(Reg r);
+    Instruction&amp; with_dst_reg(Reg r);
+    Instruction&amp; with_mem_access(uint64_t addr, std::size_t size, bool is_load);
+    Instruction&amp; with_branch(uint64_t target, bool taken);
+};</code></pre>
+
+        <h2>InstrStatus Enum</h2>
+
+        <p>Tracks the lifecycle of an instruction as it progresses through the out-of-order pipeline:</p>
+
+        <pre><code class="language-cpp">enum class InstrStatus : uint8_t {
+    Waiting,     // In window, waiting for dependencies
+    Ready,       // Dependencies resolved, ready to issue
+    Executing,   // Currently executing on functional unit
+    Completed,   // Execution finished, result available
+    Committed    // Retired from pipeline
+};</code></pre>
+
+        <h2>StaticVector&lt;T, N&gt;</h2>
+
+        <p>A stack-allocated small vector that avoids heap allocation. Used throughout for register lists and dependency sets:</p>
+        <ul>
+            <li><strong>Fixed capacity N:</strong> Maximum number of elements (compile-time constant)</li>
+            <li><strong>Dynamic size up to N:</strong> Can hold 0 to N elements</li>
+            <li><strong>No heap allocation:</strong> All storage is on the stack, suitable for hot-path data structures</li>
+            <li><strong>Typical usage:</strong> <code>StaticVector&lt;Reg, 4&gt;</code> for register operand lists</li>
+        </ul>
+
+        <h2>Error Handling: Result&lt;T&gt;</h2>
+
+        <p>The simulator uses a Rust-style error handling pattern based on <code>std::variant</code>:</p>
+
+        <pre><code class="language-cpp">// Rust-style error handling
+template&lt;typename T&gt;
+using Result = std::variant&lt;T, EmulatorError&gt;;
+
+// Success helper
+template&lt;typename T&gt;
+Result&lt;T&gt; Ok(T value);
+
+// Error helper
+template&lt;typename T&gt;
+Result&lt;T&gt; Err(EmulatorError error);
+
+// TRY macro for early return on error
+#define TRY(expr) \
+    ({ auto _result = (expr); \
+       if (std::holds_alternative&lt;EmulatorError&gt;(_result)) \
+           return std::get&lt;EmulatorError&gt;(_result); \
+       std::get&lt;T&gt;(std::move(_result)); })</code></pre>
+
+        <p>This pattern propagates errors up the call stack without exceptions, following the same convention used in the original Rust implementation. The <code>TRY</code> macro unwraps the success value or returns the error immediately, similar to Rust's <code>?</code> operator.</p>
+
+        <div class="page-nav">
+            <a class="nav-prev" href="09-chi-coherence.html">
+                <span class="nav-label">Prev</span>
+                <span class="nav-title">&larr; CHI Coherence</span>
+            </a>
+            <a class="nav-next" href="11-input-sources.html">
+                <span class="nav-label">Next</span>
+                <span class="nav-title">Input Sources &rarr;</span>
+            </a>
+        </div>
+
+        <div class="content-footer">
+            ARM CPU Emulator Cookbook &mdash; Built with C++20, CMake, and a passion for computer architecture.
+        </div>
+    </div>
+</main>
+
+<script src="../js/main.js"></script>
+</body>
+</html>

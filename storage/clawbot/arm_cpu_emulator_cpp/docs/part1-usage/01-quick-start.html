@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quick Start - ARM CPU Emulator Cookbook</title>
+    <link rel="stylesheet" href="../css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>body { font-family: 'Inter', var(--font-sans); }</style>
+</head>
+<body>
+
+<header class="site-header">
+    <a class="header-logo" href="../index.html">
+        <span class="logo-icon">&#x1F9E0;</span>
+        ARM CPU Emulator Cookbook
+    </a>
+    <div class="header-search">
+        <span class="search-icon">&#x1F50D;</span>
+        <input type="text" placeholder="Search docs... (Ctrl+K)" autocomplete="off">
+        <div class="search-results"></div>
+    </div>
+    <button class="menu-toggle" aria-label="Toggle menu">&#9776;</button>
+</header>
+
+<nav class="sidebar" id="sidebar">
+    <div class="nav-section">
+        <div class="nav-section-title">Part 1 &mdash; Usage Guide</div>
+        <a class="nav-item active" href="../part1-usage/01-quick-start.html">1. Quick Start</a>
+        <a class="nav-item" href="../part1-usage/02-cli-reference.html">2. CLI Reference</a>
+        <a class="nav-item" href="../part1-usage/03-input-formats.html">3. Input Formats</a>
+        <a class="nav-item" href="../part1-usage/04-writing-test-programs.html">4. Writing Test Programs</a>
+        <a class="nav-item" href="../part1-usage/05-running-simulations.html">5. Running Simulations</a>
+        <a class="nav-item" href="../part1-usage/06-output-analysis.html">6. Output &amp; Analysis</a>
+        <a class="nav-item" href="../part1-usage/07-visualization.html">7. Visualization</a>
+        <a class="nav-item" href="../part1-usage/08-configuration-presets.html">8. Configuration Presets</a>
+        <a class="nav-item" href="../part1-usage/09-benchmarks.html">9. Benchmarks</a>
+        <a class="nav-item" href="../part1-usage/10-automation-scripts.html">10. Automation Scripts</a>
+        <a class="nav-item" href="../part1-usage/11-faq.html">11. FAQ &amp; Troubleshooting</a>
+    </div>
+    <div class="nav-section">
+        <div class="nav-section-title">Part 2 &mdash; Architecture</div>
+        <a class="nav-item" href="../part2-architecture/01-system-overview.html">1. System Overview</a>
+        <a class="nav-item" href="../part2-architecture/02-cpu-pipeline.html">2. CPU Pipeline</a>
+        <a class="nav-item" href="../part2-architecture/03-ooo-engine.html">3. Out-of-Order Engine</a>
+        <a class="nav-item" href="../part2-architecture/04-instruction-decoder.html">4. Instruction Decoder</a>
+        <a class="nav-item" href="../part2-architecture/05-memory-hierarchy.html">5. Memory Hierarchy</a>
+        <a class="nav-item" href="../part2-architecture/06-elf-loader.html">6. ELF Loader</a>
+        <a class="nav-item" href="../part2-architecture/07-statistics.html">7. Statistics</a>
+        <a class="nav-item" href="../part2-architecture/08-visualization-system.html">8. Visualization System</a>
+        <a class="nav-item" href="../part2-architecture/09-chi-coherence.html">9. CHI Coherence</a>
+        <a class="nav-item" href="../part2-architecture/10-type-system.html">10. Type System</a>
+        <a class="nav-item" href="../part2-architecture/11-input-sources.html">11. Input Sources</a>
+        <a class="nav-item" href="../part2-architecture/12-gem5-comparison.html">12. GEM5 Comparison</a>
+    </div>
+</nav>
+
+<main class="main-content">
+    <div class="content-wrapper">
+
+        <div class="breadcrumb">
+            <a href="../index.html">Home</a>
+            <span class="sep">&rsaquo;</span>
+            <a href="../index.html">Usage Guide</a>
+            <span class="sep">&rsaquo;</span>
+            Quick Start
+        </div>
+
+        <div class="page-header">
+            <h1>Quick Start</h1>
+            <p class="page-desc">Get the ARM CPU Emulator built, compiled, and running your first simulation in under five minutes.</p>
+        </div>
+
+        <h2>Prerequisites</h2>
+
+        <p>The simulator requires the following tools to build and run:</p>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Tool</th>
+                    <th>Minimum Version</th>
+                    <th>Purpose</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>CMake</strong></td>
+                    <td>3.20+</td>
+                    <td>Build system configuration</td>
+                </tr>
+                <tr>
+                    <td><strong>C++ Compiler</strong></td>
+                    <td>Clang 14+ / GCC 12+</td>
+                    <td>C++20 language support</td>
+                </tr>
+                <tr>
+                    <td><strong>aarch64-elf-gcc</strong></td>
+                    <td>Any recent version</td>
+                    <td>Cross-compiling test ARM64 programs (optional for text trace input)</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <div class="callout callout-info">
+            <div class="callout-title">Dependencies are fetched automatically</div>
+            <p>All library dependencies (nlohmann/json, spdlog, GoogleTest, ankerl::unordered_dense, Capstone v5) are downloaded via CMake FetchContent. You do not need to install them manually.</p>
+        </div>
+
+        <h2>Build the Simulator</h2>
+
+        <h3>Option A: One-Click Build (Recommended)</h3>
+
+        <p>The project provides a convenience script that handles CMake configuration and compilation with auto-detected parallelism:</p>
+
+        <pre><code># Release build (default)
+./scripts/build.sh
+
+# Debug build (with symbols, no optimizations)
+./scripts/build.sh Debug</code></pre>
+
+        <h3>Option B: Manual CMake Build</h3>
+
+        <p>If you prefer to run CMake directly:</p>
+
+        <pre><code># Configure
+cmake -B build -DCMAKE_BUILD_TYPE=Release
+
+# Build (uses all available cores)
+cmake --build build -j$(nproc)</code></pre>
+
+        <div class="callout callout-tip">
+            <div class="callout-title">Build output</div>
+            <p>The compiled binary is placed at <code>build/arm_cpu_sim</code>. Test binaries (<code>test_config</code>, <code>test_ooo</code>, <code>test_simulation</code>) are also in the <code>build/</code> directory.</p>
+        </div>
+
+        <h2>Compile a Test Program</h2>
+
+        <p>The simulator executes ARM64 ELF binaries. Use the provided script to compile the built-in test source:</p>
+
+        <pre><code>./scripts/compile_test_elf.sh</code></pre>
+
+        <p>This script auto-detects the cross-compiler by searching for <code>aarch64-elf-gcc</code>, <code>aarch64-linux-gnu-gcc</code>, or <code>aarch64-none-elf-gcc</code> in your <code>PATH</code>. The compiled binary is placed at <code>tests/data/test_elf_aarch64</code>.</p>
+
+        <div class="callout callout-info">
+            <div class="callout-title">Cross-compiler installation (macOS)</div>
+            <p>On macOS, install <code>aarch64-elf-gcc</code> via Homebrew: <code>brew install aarch64-elf-gcc</code></p>
+        </div>
+
+        <h2>Run Your First Simulation</h2>
+
+        <p>Execute the simulator with the compiled test ELF binary:</p>
+
+        <pre><code># Input file: tests/data/test_elf_aarch64
+# Output file: output.json (in current directory)
+./build/arm_cpu_sim -f elf tests/data/test_elf_aarch64</code></pre>
+
+        <p>Upon completion, the simulator writes results to <code>output.json</code> in the current working directory. This file contains simulation statistics (IPC, CPI, cache hit rates, instruction mix, cycle-by-cycle pipeline trace, and Konata visualization data).</p>
+
+        <div class="callout callout-warning">
+            <div class="callout-title">Always note your file paths</div>
+            <p>When reporting simulation results, always specify both the <strong>input file path</strong> and the <strong>output file path</strong> so results are reproducible.</p>
+        </div>
+
+        <h2>Customize the Output</h2>
+
+        <p>Use <code>-o</code> to specify a custom output path:</p>
+
+        <pre><code>./build/arm_cpu_sim -f elf tests/data/test_elf_aarch64 -o results/my_sim.json</code></pre>
+
+        <p>Use <code>-n</code> to limit the number of instructions simulated (useful for quick testing):</p>
+
+        <pre><code>./build/arm_cpu_sim -f elf tests/data/test_elf_aarch64 -n 1000</code></pre>
+
+        <h2>Open the Visualization</h2>
+
+        <p>The simulator generates Konata-compatible pipeline timeline data. View it in two ways:</p>
+
+        <h3>Option A: Open HTML file directly</h3>
+
+        <p>Open the following URL in your browser:</p>
+
+        <pre><code>file:///Users/mac/storage/clawbot/arm_cpu_emulator_cpp/tools/viz_server/index.html</code></pre>
+
+        <p>Then load the output JSON file through the file picker in the visualization interface.</p>
+
+        <h3>Option B: Use the built-in web server</h3>
+
+        <p>Start a local HTTP server that serves the visualization page automatically:</p>
+
+        <pre><code>./build/arm_cpu_sim -f elf tests/data/test_elf_aarch64 -p 3000</code></pre>
+
+        <p>Then open <code>http://localhost:3000</code> in your browser. The visualization page loads automatically and the output data is available at the same address.</p>
+
+        <h2>Verify the Build</h2>
+
+        <p>Run the unit tests to confirm everything is working correctly:</p>
+
+        <pre><code># Run all unit tests
+cd build && ctest --output-on-failure
+
+# Or run the comprehensive test suite
+./scripts/test_all.sh</code></pre>
+
+        <h2>Next Steps</h2>
+
+        <ul>
+            <li><a href="02-cli-reference.html">CLI Reference</a> &mdash; Full documentation of all command-line options</li>
+            <li><a href="03-input-formats.html">Input Formats</a> &mdash; Supported input formats (ELF, text, ChampSim, JSON)</li>
+            <li><a href="04-writing-test-programs.html">Writing Test Programs</a> &mdash; How to write bare-metal ARM64 programs for the simulator</li>
+        </ul>
+
+        <div class="page-nav">
+            <div></div>
+            <a class="nav-next" href="02-cli-reference.html">
+                <span class="nav-label">Next</span>
+                <span class="nav-title">CLI Reference &rarr;</span>
+            </a>
+        </div>
+
+        <div class="content-footer">
+            ARM CPU Emulator Cookbook &mdash; Built with C++20, CMake, and a passion for computer architecture.
+        </div>
+    </div>
+</main>
+
+<script src="../js/main.js"></script>
+</body>
+</html>

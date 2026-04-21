@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FAQ &amp; Troubleshooting - ARM CPU Emulator Cookbook</title>
+    <link rel="stylesheet" href="../css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>body { font-family: 'Inter', var(--font-sans); }</style>
+</head>
+<body>
+
+<header class="site-header">
+    <a class="header-logo" href="../index.html">
+        <span class="logo-icon">&#x1F9E0;</span>
+        ARM CPU Emulator Cookbook
+    </a>
+    <div class="header-search">
+        <span class="search-icon">&#x1F50D;</span>
+        <input type="text" placeholder="Search docs... (Ctrl+K)" autocomplete="off">
+        <div class="search-results"></div>
+    </div>
+    <button class="menu-toggle" aria-label="Toggle menu">&#9776;</button>
+</header>
+
+<nav class="sidebar" id="sidebar">
+    <div class="nav-section">
+        <div class="nav-section-title">Part 1 &mdash; Usage Guide</div>
+        <a class="nav-item" href="../part1-usage/01-quick-start.html">1. Quick Start</a>
+        <a class="nav-item" href="../part1-usage/02-cli-reference.html">2. CLI Reference</a>
+        <a class="nav-item" href="../part1-usage/03-input-formats.html">3. Input Formats</a>
+        <a class="nav-item" href="../part1-usage/04-writing-test-programs.html">4. Writing Test Programs</a>
+        <a class="nav-item" href="../part1-usage/05-running-simulations.html">5. Running Simulations</a>
+        <a class="nav-item" href="../part1-usage/06-output-analysis.html">6. Output &amp; Analysis</a>
+        <a class="nav-item" href="../part1-usage/07-visualization.html">7. Visualization</a>
+        <a class="nav-item" href="../part1-usage/08-configuration-presets.html">8. Configuration Presets</a>
+        <a class="nav-item" href="../part1-usage/09-benchmarks.html">9. Benchmarks</a>
+        <a class="nav-item" href="../part1-usage/10-automation-scripts.html">10. Automation Scripts</a>
+        <a class="nav-item active" href="../part1-usage/11-faq.html">11. FAQ &amp; Troubleshooting</a>
+    </div>
+    <div class="nav-section">
+        <div class="nav-section-title">Part 2 &mdash; Architecture</div>
+        <a class="nav-item" href="../part2-architecture/01-system-overview.html">1. System Overview</a>
+        <a class="nav-item" href="../part2-architecture/02-cpu-pipeline.html">2. CPU Pipeline</a>
+        <a class="nav-item" href="../part2-architecture/03-ooo-engine.html">3. Out-of-Order Engine</a>
+        <a class="nav-item" href="../part2-architecture/04-instruction-decoder.html">4. Instruction Decoder</a>
+        <a class="nav-item" href="../part2-architecture/05-memory-hierarchy.html">5. Memory Hierarchy</a>
+        <a class="nav-item" href="../part2-architecture/06-elf-loader.html">6. ELF Loader</a>
+        <a class="nav-item" href="../part2-architecture/07-statistics.html">7. Statistics</a>
+        <a class="nav-item" href="../part2-architecture/08-visualization-system.html">8. Visualization System</a>
+        <a class="nav-item" href="../part2-architecture/09-chi-coherence.html">9. CHI Coherence</a>
+        <a class="nav-item" href="../part2-architecture/10-type-system.html">10. Type System</a>
+        <a class="nav-item" href="../part2-architecture/11-input-sources.html">11. Input Sources</a>
+        <a class="nav-item" href="../part2-architecture/12-gem5-comparison.html">12. GEM5 Comparison</a>
+    </div>
+</nav>
+
+<main class="main-content">
+    <div class="content-wrapper">
+
+        <div class="breadcrumb">
+            <a href="../index.html">Home</a>
+            <span class="sep">&rsaquo;</span>
+            <a href="../index.html">Usage Guide</a>
+            <span class="sep">&rsaquo;</span>
+            FAQ &amp; Troubleshooting
+        </div>
+
+        <div class="page-header">
+            <h1>FAQ &amp; Troubleshooting</h1>
+            <p class="page-desc">Common issues and their solutions for building, running, and visualizing simulations with the ARM CPU Emulator.</p>
+        </div>
+
+        <h2>Build Issues</h2>
+
+        <div class="faq-item">
+            <h3>Q: CMake configure fails with "CMake 3.20 or higher required"</h3>
+            <p><strong>A:</strong> Install a newer CMake: <code>brew install cmake</code> (macOS) or use your distribution's package manager.</p>
+        </div>
+
+        <div class="faq-item">
+            <h3>Q: Compilation fails with C++20 errors</h3>
+            <p><strong>A:</strong> Ensure you have a C++20-capable compiler: clang 14+, GCC 12+, or Apple Clang 15+.</p>
+        </div>
+
+        <div class="faq-item">
+            <h3>Q: Capstone fetch fails during CMake configure</h3>
+            <p><strong>A:</strong> Capstone v5 is fetched via CMake FetchContent. Ensure you have internet access during the first build. The fetched dependency is cached for subsequent builds.</p>
+        </div>
+
+        <div class="faq-item">
+            <h3>Q: liblzma not found (ChampSim XZ support)</h3>
+            <p><strong>A:</strong> Install XZ utilities: <code>brew install xz</code> (macOS) or <code>apt install liblzma-dev</code> (Ubuntu). This is only needed for ChampSim XZ format.</p>
+        </div>
+
+        <h2>Simulation Issues</h2>
+
+        <div class="faq-item">
+            <h3>Q: Simulation produces no output / empty JSON</h3>
+            <p><strong>A:</strong> Check that the trace file exists and is readable. Use <code>-v</code> for verbose output. Verify the format flag matches the file type.</p>
+        </div>
+
+        <div class="faq-item">
+            <h3>Q: "Unsupported instruction" error during ELF simulation</h3>
+            <p><strong>A:</strong> The Capstone decoder supports ~500 ARM64 mnemonics. Some rare or privileged instructions may not be supported. Check the instruction at the reported PC address.</p>
+        </div>
+
+        <div class="faq-item">
+            <h3>Q: Simulation runs forever / takes very long</h3>
+            <p><strong>A:</strong> Use <code>-n</code> (max instructions) or <code>-c</code> (max cycles) to limit simulation scope. Use <code>-e</code> (event mode) for faster batch simulation without visualization overhead.</p>
+        </div>
+
+        <div class="faq-item">
+            <h3>Q: Different results each run</h3>
+            <p><strong>A:</strong> Results should be deterministic for the same input and configuration. If you see non-deterministic behavior, check for uninitialized memory in your test program.</p>
+        </div>
+
+        <h2>Visualization Issues</h2>
+
+        <div class="faq-item">
+            <h3>Q: Visualization page is blank / no data shown</h3>
+            <p><strong>A:</strong> Ensure you loaded the correct <code>output.json</code> file. The file must be generated by a simulation run (not event mode <code>-e</code>, which doesn't produce Konata data). Check browser console for JavaScript errors.</p>
+        </div>
+
+        <div class="faq-item">
+            <h3>Q: Web server mode (<code>-p</code>) doesn't work</h3>
+            <p><strong>A:</strong> Ensure the port is not in use. Try a different port: <code>-p 8080</code>. Check firewall settings.</p>
+        </div>
+
+        <h2>Cross-Compilation Issues</h2>
+
+        <div class="faq-item">
+            <h3>Q: <code>aarch64-elf-gcc</code> not found</h3>
+            <p><strong>A:</strong> Install via Homebrew: <code>brew install aarch64-elf-gcc</code> (macOS). On Linux: <code>apt install gcc-aarch64-linux-gnu</code>.</p>
+        </div>
+
+        <div class="faq-item">
+            <h3>Q: Dynamically linked ELF fails to load</h3>
+            <p><strong>A:</strong> Dynamic ELF requires a glibc sysroot for the target architecture. Use static linking (<code>-static -nostdlib</code>) for reliable simulation.</p>
+        </div>
+
+        <h2>Performance Issues</h2>
+
+        <div class="faq-item">
+            <h3>Q: Simulation is slow</h3>
+            <p><strong>A:</strong> Try these optimizations:</p>
+            <ul>
+                <li>Use <code>-e</code> (event mode) to skip visualization overhead</li>
+                <li>Reduce max instructions with <code>-n</code></li>
+                <li>Use <code>--preset minimal</code> for faster testing</li>
+                <li>Use Release build: <code>./scripts/build.sh Release</code></li>
+            </ul>
+        </div>
+
+        <div class="faq-item">
+            <h3>Q: High memory usage</h3>
+            <p><strong>A:</strong> Memory usage scales with instruction window size and trace length. Reduce <code>--window-size</code> or use <code>-n</code> to limit instructions.</p>
+        </div>
+
+        <div class="callout callout-warning">
+            <div class="callout-title">Still stuck?</div>
+            <p>Check the <a href="10-automation-scripts.html">Automation Scripts</a> page for the full test suite (<code>./scripts/test_all.sh</code>), which can help identify whether an issue is environment-specific or a bug in the simulator.</p>
+        </div>
+
+        <div class="page-nav">
+            <a class="nav-prev" href="10-automation-scripts.html">
+                <span class="nav-label">Prev</span>
+                <span class="nav-title">&larr; Automation Scripts</span>
+            </a>
+            <a class="nav-next" href="../part2-architecture/01-system-overview.html">
+                <span class="nav-label">Next</span>
+                <span class="nav-title">System Overview &rarr;</span>
+            </a>
+        </div>
+
+        <div class="content-footer">
+            ARM CPU Emulator Cookbook &mdash; Built with C++20, CMake, and a passion for computer architecture.
+        </div>
+    </div>
+</main>
+
+<script src="../js/main.js"></script>
+</body>
+</html>

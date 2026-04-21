@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Out-of-Order Engine - ARM CPU Emulator Cookbook</title>
+    <link rel="stylesheet" href="../css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>body { font-family: 'Inter', var(--font-sans); }</style>
+</head>
+<body>
+
+<header class="site-header">
+    <a class="header-logo" href="../index.html">
+        <span class="logo-icon">&#x1F9E0;</span>
+        ARM CPU Emulator Cookbook
+    </a>
+    <div class="header-search">
+        <span class="search-icon">&#x1F50D;</span>
+        <input type="text" placeholder="Search docs... (Ctrl+K)" autocomplete="off">
+        <div class="search-results"></div>
+    </div>
+    <button class="menu-toggle" aria-label="Toggle menu">&#9776;</button>
+</header>
+
+<nav class="sidebar" id="sidebar">
+    <div class="nav-section">
+        <div class="nav-section-title">Part 1 &mdash; Usage Guide</div>
+        <a class="nav-item" href="../part1-usage/01-quick-start.html">1. Quick Start</a>
+        <a class="nav-item" href="../part1-usage/02-cli-reference.html">2. CLI Reference</a>
+        <a class="nav-item" href="../part1-usage/03-input-formats.html">3. Input Formats</a>
+        <a class="nav-item" href="../part1-usage/04-writing-test-programs.html">4. Writing Test Programs</a>
+        <a class="nav-item" href="../part1-usage/05-running-simulations.html">5. Running Simulations</a>
+        <a class="nav-item" href="../part1-usage/06-output-analysis.html">6. Output &amp; Analysis</a>
+        <a class="nav-item" href="../part1-usage/07-visualization.html">7. Visualization</a>
+        <a class="nav-item" href="../part1-usage/08-configuration-presets.html">8. Configuration Presets</a>
+        <a class="nav-item" href="../part1-usage/09-benchmarks.html">9. Benchmarks</a>
+        <a class="nav-item" href="../part1-usage/10-automation-scripts.html">10. Automation Scripts</a>
+        <a class="nav-item" href="../part1-usage/11-faq.html">11. FAQ &amp; Troubleshooting</a>
+    </div>
+    <div class="nav-section">
+        <div class="nav-section-title">Part 2 &mdash; Architecture</div>
+        <a class="nav-item" href="../part2-architecture/01-system-overview.html">1. System Overview</a>
+        <a class="nav-item" href="../part2-architecture/02-cpu-pipeline.html">2. CPU Pipeline</a>
+        <a class="nav-item active" href="../part2-architecture/03-ooo-engine.html">3. Out-of-Order Engine</a>
+        <a class="nav-item" href="../part2-architecture/04-instruction-decoder.html">4. Instruction Decoder</a>
+        <a class="nav-item" href="../part2-architecture/05-memory-hierarchy.html">5. Memory Hierarchy</a>
+        <a class="nav-item" href="../part2-architecture/06-elf-loader.html">6. ELF Loader</a>
+        <a class="nav-item" href="../part2-architecture/07-statistics.html">7. Statistics</a>
+        <a class="nav-item" href="../part2-architecture/08-visualization-system.html">8. Visualization System</a>
+        <a class="nav-item" href="../part2-architecture/09-chi-coherence.html">9. CHI Coherence</a>
+        <a class="nav-item" href="../part2-architecture/10-type-system.html">10. Type System</a>
+        <a class="nav-item" href="../part2-architecture/11-input-sources.html">11. Input Sources</a>
+        <a class="nav-item" href="../part2-architecture/12-gem5-comparison.html">12. GEM5 Comparison</a>
+    </div>
+</nav>
+
+<main class="main-content">
+    <div class="content-wrapper">
+
+        <div class="breadcrumb">
+            <a href="../index.html">Home</a>
+            <span class="sep">&rsaquo;</span>
+            <a href="../index.html">Architecture</a>
+            <span class="sep">&rsaquo;</span>
+            Out-of-Order Engine
+        </div>
+
+        <div class="page-header">
+            <h1>Out-of-Order Engine</h1>
+            <p class="page-desc">The core of the simulator implementing out-of-order execution with speculative execution support.</p>
+        </div>
+
+        <p>The OoO engine is the core of the simulator, implementing out-of-order execution with speculative execution support.</p>
+
+        <h2>Architecture Overview</h2>
+
+        <p>Three main components work together to enable out-of-order execution:</p>
+
+        <ol>
+            <li><strong>Instruction Window</strong> (<code>ooo/window.hpp</code>): The Reorder Buffer (ROB) that holds all in-flight instructions</li>
+            <li><strong>Dependency Tracker</strong> (<code>ooo/dependency.hpp</code>): Tracks register and memory dependencies</li>
+            <li><strong>Scheduler</strong> (<code>ooo/scheduler.hpp</code>): Selects ready instructions for execution</li>
+        </ol>
+
+        <h2>Instruction Window (ROB)</h2>
+
+        <p>The instruction window is the central data structure of the OoO engine:</p>
+
+        <ul>
+            <li>Size configurable via <code>window_size</code> (default: 128)</li>
+            <li>Each entry is a <code>WindowEntry</code> with:
+                <ul>
+                    <li><code>Instruction</code> data</li>
+                    <li><code>InstrStatus</code> state machine: Waiting &rarr; Ready &rarr; Executing &rarr; Completed &rarr; Committed</li>
+                    <li>Physical register mappings</li>
+                    <li>Dependency counters (remaining register + memory dependencies)</li>
+                </ul>
+            </li>
+            <li>Instructions enter at the tail and commit from the head (in-order commit)</li>
+            <li>When the window is full, fetch stalls</li>
+        </ul>
+
+        <h2>Dependency Tracking</h2>
+
+        <p>Dependencies are tracked at two levels:</p>
+
+        <h3>Register Dependencies</h3>
+        <ul>
+            <li>Producer-consumer relationships via register renaming</li>
+            <li>Each instruction tracks which physical registers it produces (destination) and consumes (sources)</li>
+            <li>Dependencies resolved when producer completes writeback</li>
+        </ul>
+
+        <h3>Memory Dependencies</h3>
+        <ul>
+            <li><strong>Load-after-Store (RAW)</strong>: Load must wait for preceding store to the same address</li>
+            <li><strong>Store-after-Store (WAW)</strong>: Stores must complete in program order</li>
+            <li>Address-based disambiguation for load/store ordering</li>
+        </ul>
+
+        <h2>Scheduler</h2>
+
+        <p>The scheduler examines all instructions in the window each cycle and performs the following steps:</p>
+
+        <ol>
+            <li>Examines all Waiting instructions in the window each cycle</li>
+            <li>Wakes up instructions whose dependencies are satisfied (transition to Ready)</li>
+            <li>Selects up to <code>issue_width</code> Ready instructions per cycle</li>
+            <li>Priority: oldest ready instructions first (in program order)</li>
+        </ol>
+
+        <h2>Execution Unit Types</h2>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Unit Type</th>
+                    <th>Description</th>
+                    <th>Typical Latency</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><code>IntAlu</code></td>
+                    <td>Integer arithmetic/logic</td>
+                    <td>1 cycle</td>
+                </tr>
+                <tr>
+                    <td><code>IntMul</code></td>
+                    <td>Integer multiply</td>
+                    <td>3 cycles</td>
+                </tr>
+                <tr>
+                    <td><code>Load</code></td>
+                    <td>Memory load</td>
+                    <td>4 cycles (L1 hit)</td>
+                </tr>
+                <tr>
+                    <td><code>Store</code></td>
+                    <td>Memory store</td>
+                    <td>1 cycle</td>
+                </tr>
+                <tr>
+                    <td><code>Branch</code></td>
+                    <td>Conditional/unconditional branch</td>
+                    <td>1 cycle</td>
+                </tr>
+                <tr>
+                    <td><code>FpSimd</code></td>
+                    <td>Floating point / SIMD</td>
+                    <td>3&ndash;5 cycles</td>
+                </tr>
+                <tr>
+                    <td><code>System</code></td>
+                    <td>System instructions (barriers, etc.)</td>
+                    <td>1&ndash;10 cycles</td>
+                </tr>
+                <tr>
+                    <td><code>Crypto</code></td>
+                    <td>Cryptographic instructions</td>
+                    <td>varies</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>Key Implementation Files</h2>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>File</th>
+                    <th>Description</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><code>include/arm_cpu/ooo/ooo_engine.hpp</code></td>
+                    <td>Main engine class</td>
+                </tr>
+                <tr>
+                    <td><code>include/arm_cpu/ooo/dependency.hpp</code></td>
+                    <td>Dependency tracking</td>
+                </tr>
+                <tr>
+                    <td><code>include/arm_cpu/ooo/scheduler.hpp</code></td>
+                    <td>Instruction scheduling</td>
+                </tr>
+                <tr>
+                    <td><code>include/arm_cpu/ooo/window.hpp</code></td>
+                    <td>Instruction window/ROB</td>
+                </tr>
+                <tr>
+                    <td><code>src/ooo/ooo_engine.cpp</code></td>
+                    <td>Engine implementation</td>
+                </tr>
+                <tr>
+                    <td><code>src/ooo/dependency.cpp</code></td>
+                    <td>Dependency resolution</td>
+                </tr>
+                <tr>
+                    <td><code>src/ooo/scheduler.cpp</code></td>
+                    <td>Scheduler logic</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <div class="page-nav">
+            <a class="nav-prev" href="02-cpu-pipeline.html">
+                <span class="nav-label">Prev</span>
+                <span class="nav-title">&larr; CPU Pipeline</span>
+            </a>
+            <a class="nav-next" href="04-instruction-decoder.html">
+                <span class="nav-label">Next</span>
+                <span class="nav-title">Instruction Decoder &rarr;</span>
+            </a>
+        </div>
+
+        <div class="content-footer">
+            ARM CPU Emulator Cookbook &mdash; Built with C++20, CMake, and a passion for computer architecture.
+        </div>
+    </div>
+</main>
+
+<script src="../js/main.js"></script>
+</body>
+</html>

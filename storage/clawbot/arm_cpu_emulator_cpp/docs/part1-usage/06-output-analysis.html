@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Output &amp; Analysis - ARM CPU Emulator Cookbook</title>
+    <link rel="stylesheet" href="../css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>body { font-family: 'Inter', var(--font-sans); }</style>
+</head>
+<body>
+
+<header class="site-header">
+    <a class="header-logo" href="../index.html">
+        <span class="logo-icon">&#x1F9E0;</span>
+        ARM CPU Emulator Cookbook
+    </a>
+    <div class="header-search">
+        <span class="search-icon">&#x1F50D;</span>
+        <input type="text" placeholder="Search docs... (Ctrl+K)" autocomplete="off">
+        <div class="search-results"></div>
+    </div>
+    <button class="menu-toggle" aria-label="Toggle menu">&#9776;</button>
+</header>
+
+<nav class="sidebar" id="sidebar">
+    <div class="nav-section">
+        <div class="nav-section-title">Part 1 &mdash; Usage Guide</div>
+        <a class="nav-item" href="../part1-usage/01-quick-start.html">1. Quick Start</a>
+        <a class="nav-item" href="../part1-usage/02-cli-reference.html">2. CLI Reference</a>
+        <a class="nav-item" href="../part1-usage/03-input-formats.html">3. Input Formats</a>
+        <a class="nav-item" href="../part1-usage/04-writing-test-programs.html">4. Writing Test Programs</a>
+        <a class="nav-item" href="../part1-usage/05-running-simulations.html">5. Running Simulations</a>
+        <a class="nav-item active" href="../part1-usage/06-output-analysis.html">6. Output &amp; Analysis</a>
+        <a class="nav-item" href="../part1-usage/07-visualization.html">7. Visualization</a>
+        <a class="nav-item" href="../part1-usage/08-configuration-presets.html">8. Configuration Presets</a>
+        <a class="nav-item" href="../part1-usage/09-benchmarks.html">9. Benchmarks</a>
+        <a class="nav-item" href="../part1-usage/10-automation-scripts.html">10. Automation Scripts</a>
+        <a class="nav-item" href="../part1-usage/11-faq.html">11. FAQ &amp; Troubleshooting</a>
+    </div>
+    <div class="nav-section">
+        <div class="nav-section-title">Part 2 &mdash; Architecture</div>
+        <a class="nav-item" href="../part2-architecture/01-system-overview.html">1. System Overview</a>
+        <a class="nav-item" href="../part2-architecture/02-cpu-pipeline.html">2. CPU Pipeline</a>
+        <a class="nav-item" href="../part2-architecture/03-ooo-engine.html">3. Out-of-Order Engine</a>
+        <a class="nav-item" href="../part2-architecture/04-instruction-decoder.html">4. Instruction Decoder</a>
+        <a class="nav-item" href="../part2-architecture/05-memory-hierarchy.html">5. Memory Hierarchy</a>
+        <a class="nav-item" href="../part2-architecture/06-elf-loader.html">6. ELF Loader</a>
+        <a class="nav-item" href="../part2-architecture/07-statistics.html">7. Statistics</a>
+        <a class="nav-item" href="../part2-architecture/08-visualization-system.html">8. Visualization System</a>
+        <a class="nav-item" href="../part2-architecture/09-chi-coherence.html">9. CHI Coherence</a>
+        <a class="nav-item" href="../part2-architecture/10-type-system.html">10. Type System</a>
+        <a class="nav-item" href="../part2-architecture/11-input-sources.html">11. Input Sources</a>
+        <a class="nav-item" href="../part2-architecture/12-gem5-comparison.html">12. GEM5 Comparison</a>
+    </div>
+</nav>
+
+<main class="main-content">
+    <div class="content-wrapper">
+
+        <div class="breadcrumb">
+            <a href="../index.html">Home</a>
+            <span class="sep">&rsaquo;</span>
+            <a href="../index.html">Usage Guide</a>
+            <span class="sep">&rsaquo;</span>
+            Output &amp; Analysis
+        </div>
+
+        <div class="page-header">
+            <h1>Output &amp; Analysis</h1>
+            <p class="page-desc">Understand the JSON output format, performance metrics, and how to interpret simulation results.</p>
+        </div>
+
+        <h2>JSON Output File</h2>
+
+        <p>The simulator writes results to a JSON file (default: <code>output.json</code>, configurable with <code>-o</code>). The output contains three main sections:</p>
+
+        <h3>1. Metadata</h3>
+        <p>A snapshot of the CPU configuration used for the simulation, including:</p>
+        <ul>
+            <li><code>window_size</code> (ROB size)</li>
+            <li><code>fetch_width</code>, <code>issue_width</code>, <code>commit_width</code></li>
+            <li>Cache sizes and associativities (L1, L2, L3)</li>
+            <li>Cache latencies</li>
+            <li>CPU frequency</li>
+            <li>Load/store queue sizes and pipeline counts</li>
+        </ul>
+
+        <h3>2. Operations</h3>
+        <p>Per-instruction pipeline timing data. Each entry records the cycle at which the instruction passed through each pipeline stage:</p>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Field</th>
+                    <th>Description</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr><td><code>fetch_cycle</code></td><td>Cycle when instruction was fetched</td></tr>
+                <tr><td><code>decode_cycle</code></td><td>Cycle when instruction was decoded</td></tr>
+                <tr><td><code>rename_cycle</code></td><td>Cycle when register renaming completed</td></tr>
+                <tr><td><code>dispatch_cycle</code></td><td>Cycle when instruction was dispatched to issue queue</td></tr>
+                <tr><td><code>issue_cycle</code></td><td>Cycle when instruction was issued to a functional unit</td></tr>
+                <tr><td><code>execute_cycle</code></td><td>Cycle when execution began</td></tr>
+                <tr><td><code>memory_cycle</code></td><td>Cycle when memory access completed (load/store only)</td></tr>
+                <tr><td><code>writeback_cycle</code></td><td>Cycle when result was written back</td></tr>
+                <tr><td><code>commit_cycle</code></td><td>Cycle when instruction retired (committed)</td></tr>
+            </tbody>
+        </table>
+
+        <h3>3. Lanes</h3>
+        <p>Pipeline stage details per cycle, used by the Konata visualization to render the timeline chart.</p>
+
+        <h2>Performance Metrics</h2>
+
+        <p>Performance metrics are emitted with the <code>-j</code> flag (to stdout) or included in the output JSON. The key metrics are:</p>
+
+        <h3>IPC (Instructions Per Cycle)</h3>
+        <p><code>total_instructions / total_cycles</code>. Higher is better. A well-optimized out-of-order core typically achieves IPC &gt; 1.0 for non-memory-bound workloads.</p>
+
+        <h3>CPI (Cycles Per Instruction)</h3>
+        <p>Inverse of IPC. Lower is better. Useful for comparing against in-order processors.</p>
+
+        <h3>Cache Hit Rate</h3>
+        <p><code>hits / (hits + misses)</code> for each cache level (L1, L2, L3). A high L1 hit rate (&gt; 90%) is critical for performance.</p>
+
+        <h3>MPKI (Misses Per Kilo Instructions)</h3>
+        <p><code>cache_misses * 1000 / total_instructions</code>. Normalized metric for comparing cache performance across different simulation lengths.</p>
+
+        <h3>Branch Prediction Accuracy</h3>
+        <p><code>correct_predictions / total_branches</code>. Modern branch predictors achieve &gt; 95% accuracy on typical workloads.</p>
+
+        <h3>Functional Unit Utilization</h3>
+        <p>Breakdown of how busy each functional unit type was during the simulation:</p>
+        <ul>
+            <li><strong>IntAlu</strong> &mdash; Integer arithmetic and logic</li>
+            <li><strong>IntMul</strong> &mdash; Integer multiply and divide</li>
+            <li><strong>Load</strong> &mdash; Load units</li>
+            <li><strong>Store</strong> &mdash; Store units</li>
+            <li><strong>Branch</strong> &mdash; Branch resolution</li>
+            <li><strong>FpSimd</strong> &mdash; Floating-point and SIMD</li>
+            <li><strong>System</strong> &mdash; System instructions (barriers, etc.)</li>
+            <li><strong>Crypto</strong> &mdash; Cryptographic instructions</li>
+        </ul>
+
+        <h3>Pipeline Stall Distribution</h3>
+        <p>Breakdown of pipeline stalls by type:</p>
+        <ul>
+            <li><strong>Data hazard</strong> &mdash; Waiting for a register dependency</li>
+            <li><strong>Control hazard</strong> &mdash; Waiting for branch resolution</li>
+            <li><strong>Structural hazard</strong> &mdash; No available functional unit</li>
+            <li><strong>Memory</strong> &mdash; Waiting for cache or memory access</li>
+        </ul>
+
+        <h3>Time Series</h3>
+        <p>Per-1000-cycle sampling of IPC and other metrics, useful for identifying performance phase changes over the course of a simulation.</p>
+
+        <h2>Example JSON Metrics Output</h2>
+
+        <pre><code>{
+  "total_instructions": 1000,
+  "total_cycles": 2500,
+  "ipc": 0.40,
+  "cache": {
+    "l1": { "hits": 800, "misses": 200, "hit_rate": 0.80 },
+    "l2": { "hits": 150, "misses": 50, "hit_rate": 0.75 },
+    "l3": { "hits": 40, "misses": 10, "hit_rate": 0.80 }
+  },
+  "branch_prediction": { "correct": 180, "total": 200, "accuracy": 0.90 },
+  "fu_utilization": {
+    "int_alu": 0.45,
+    "load": 0.25,
+    "store": 0.15,
+    "branch": 0.10,
+    "fp_simd": 0.05
+  }
+}</code></pre>
+
+        <h2>Detailed Trace Options</h2>
+
+        <h3>Save Execution Trace</h3>
+        <p>Use <code>--save-trace</code> to save a detailed execution trace including per-cycle state of all pipeline stages:</p>
+        <pre><code>./build/arm_cpu_sim -f elf program.elf --save-trace</code></pre>
+
+        <h3>Dump Specific Instruction Range</h3>
+        <p>Use <code>--dump-range</code> to dump the pipeline trace for a specific instruction range:</p>
+        <pre><code># Dump pipeline trace for instructions 100 through 200
+./build/arm_cpu_sim -f elf program.elf --dump-range 100:200</code></pre>
+
+        <h2>Tips for Analyzing Results</h2>
+
+        <div class="callout callout-tip">
+            <div class="callout-title">Low IPC + high L1 miss rate</div>
+            <p>The workload is memory-bound. Consider increasing the L1 cache size, improving prefetching, or optimizing the data access pattern in the test program.</p>
+        </div>
+
+        <div class="callout callout-tip">
+            <div class="callout-title">Low IPC + low branch accuracy</div>
+            <p>The workload is branch-heavy with hard-to-predict branches. Consider branch predictor improvements or reducing branch density in the test program.</p>
+        </div>
+
+        <div class="callout callout-tip">
+            <div class="callout-title">High FU utilization imbalance</div>
+            <p>The workload has specific resource bottlenecks. For example, if the load units are saturated but IntAlu is idle, the program is limited by memory bandwidth rather than compute throughput.</p>
+        </div>
+
+        <div class="page-nav">
+            <a class="nav-prev" href="05-running-simulations.html">
+                <span class="nav-label">Prev</span>
+                <span class="nav-title">&larr; Running Simulations</span>
+            </a>
+            <a class="nav-next" href="07-visualization.html">
+                <span class="nav-label">Next</span>
+                <span class="nav-title">Visualization &rarr;</span>
+            </a>
+        </div>
+
+        <div class="content-footer">
+            ARM CPU Emulator Cookbook &mdash; Built with C++20, CMake, and a passion for computer architecture.
+        </div>
+    </div>
+</main>
+
+<script src="../js/main.js"></script>
+</body>
+</html>

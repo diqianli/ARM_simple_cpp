@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CPU Pipeline - ARM CPU Emulator Cookbook</title>
+    <link rel="stylesheet" href="../css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>body { font-family: 'Inter', var(--font-sans); }</style>
+</head>
+<body>
+
+<header class="site-header">
+    <a class="header-logo" href="../index.html">
+        <span class="logo-icon">&#x1F9E0;</span>
+        ARM CPU Emulator Cookbook
+    </a>
+    <div class="header-search">
+        <span class="search-icon">&#x1F50D;</span>
+        <input type="text" placeholder="Search docs... (Ctrl+K)" autocomplete="off">
+        <div class="search-results"></div>
+    </div>
+    <button class="menu-toggle" aria-label="Toggle menu">&#9776;</button>
+</header>
+
+<nav class="sidebar" id="sidebar">
+    <div class="nav-section">
+        <div class="nav-section-title">Part 1 &mdash; Usage Guide</div>
+        <a class="nav-item" href="../part1-usage/01-quick-start.html">1. Quick Start</a>
+        <a class="nav-item" href="../part1-usage/02-cli-reference.html">2. CLI Reference</a>
+        <a class="nav-item" href="../part1-usage/03-input-formats.html">3. Input Formats</a>
+        <a class="nav-item" href="../part1-usage/04-writing-test-programs.html">4. Writing Test Programs</a>
+        <a class="nav-item" href="../part1-usage/05-running-simulations.html">5. Running Simulations</a>
+        <a class="nav-item" href="../part1-usage/06-output-analysis.html">6. Output &amp; Analysis</a>
+        <a class="nav-item" href="../part1-usage/07-visualization.html">7. Visualization</a>
+        <a class="nav-item" href="../part1-usage/08-configuration-presets.html">8. Configuration Presets</a>
+        <a class="nav-item" href="../part1-usage/09-benchmarks.html">9. Benchmarks</a>
+        <a class="nav-item" href="../part1-usage/10-automation-scripts.html">10. Automation Scripts</a>
+        <a class="nav-item" href="../part1-usage/11-faq.html">11. FAQ &amp; Troubleshooting</a>
+    </div>
+    <div class="nav-section">
+        <div class="nav-section-title">Part 2 &mdash; Architecture</div>
+        <a class="nav-item" href="../part2-architecture/01-system-overview.html">1. System Overview</a>
+        <a class="nav-item active" href="../part2-architecture/02-cpu-pipeline.html">2. CPU Pipeline</a>
+        <a class="nav-item" href="../part2-architecture/03-ooo-engine.html">3. Out-of-Order Engine</a>
+        <a class="nav-item" href="../part2-architecture/04-instruction-decoder.html">4. Instruction Decoder</a>
+        <a class="nav-item" href="../part2-architecture/05-memory-hierarchy.html">5. Memory Hierarchy</a>
+        <a class="nav-item" href="../part2-architecture/06-elf-loader.html">6. ELF Loader</a>
+        <a class="nav-item" href="../part2-architecture/07-statistics.html">7. Statistics</a>
+        <a class="nav-item" href="../part2-architecture/08-visualization-system.html">8. Visualization System</a>
+        <a class="nav-item" href="../part2-architecture/09-chi-coherence.html">9. CHI Coherence</a>
+        <a class="nav-item" href="../part2-architecture/10-type-system.html">10. Type System</a>
+        <a class="nav-item" href="../part2-architecture/11-input-sources.html">11. Input Sources</a>
+        <a class="nav-item" href="../part2-architecture/12-gem5-comparison.html">12. GEM5 Comparison</a>
+    </div>
+</nav>
+
+<main class="main-content">
+    <div class="content-wrapper">
+
+        <div class="breadcrumb">
+            <a href="../index.html">Home</a>
+            <span class="sep">&rsaquo;</span>
+            <a href="../index.html">Architecture</a>
+            <span class="sep">&rsaquo;</span>
+            CPU Pipeline
+        </div>
+
+        <div class="page-header">
+            <h1>CPU Pipeline</h1>
+            <p class="page-desc">The 9-stage out-of-order pipeline that drives instruction execution in the simulator.</p>
+        </div>
+
+        <p>The simulator models a 9-stage out-of-order pipeline, processing instructions from fetch through commit with out-of-order execution in the middle stages.</p>
+
+        <h2>Pipeline Stages</h2>
+
+        <ol>
+            <li>
+                <strong>Fetch (IF)</strong>: Reads instructions from the input source (trace or ELF). Fetches up to <code>fetch_width</code> instructions per cycle.
+            </li>
+            <li>
+                <strong>Decode (DE)</strong>: Decodes raw instruction bytes into internal <code>Instruction</code> structures. Two decoder paths:
+                <ul>
+                    <li>Capstone path (ELF input): ~500 mnemonics via Capstone v5</li>
+                    <li>Text trace path: ~40 mnemonics via custom parser</li>
+                </ul>
+            </li>
+            <li>
+                <strong>Rename (RN)</strong>: Register renaming to eliminate false dependencies. Maps architectural registers (X0&ndash;X30, V0&ndash;V31) to physical registers.
+            </li>
+            <li>
+                <strong>Dispatch (DI)</strong>: Dispatches renamed instructions to the instruction window (ROB). Tracks dependencies between instructions.
+            </li>
+            <li>
+                <strong>Issue (IS)</strong>: Wake-up and select ready instructions from the window. Uses scoreboarding for dependency tracking. Issues up to <code>issue_width</code> instructions per cycle.
+            </li>
+            <li>
+                <strong>Execute (EX)</strong>: Instructions execute on functional units. Different units have different latencies:
+                <ul>
+                    <li>Integer ALU: 1 cycle (ADD, SUB, AND, OR, etc.)</li>
+                    <li>Integer Multiply: 3 cycles</li>
+                    <li>Load: 4 cycles (L1 hit)</li>
+                    <li>Store: 1 cycle (address calculation)</li>
+                    <li>Branch: 1 cycle</li>
+                    <li>FP/SIMD: 3&ndash;5 cycles</li>
+                    <li>Crypto: varies</li>
+                </ul>
+            </li>
+            <li>
+                <strong>Memory Complete (ME)</strong>: Load data returns from cache hierarchy. May stall for cache misses.
+            </li>
+            <li>
+                <strong>Writeback (WB)</strong>: Results are written back and broadcast to dependent instructions in the window.
+            </li>
+            <li>
+                <strong>Commit (RR)</strong>: Instructions commit in program order. Up to <code>commit_width</code> per cycle. Updates architectural state.
+            </li>
+        </ol>
+
+        <h2>Main Loop Implementation</h2>
+
+        <p>The pipeline is driven by <code>CPUEmulator::run()</code> in <code>src/cpu.cpp</code>. Each cycle:</p>
+
+        <ol>
+            <li>Commit completed instructions (in-order)</li>
+            <li>Write back results</li>
+            <li>Execute ready instructions</li>
+            <li>Issue new instructions from window</li>
+            <li>Dispatch/decode/fetch new instructions</li>
+            <li>Update statistics</li>
+        </ol>
+
+        <h2>Pipeline Diagram</h2>
+
+        <div class="pipeline-diagram">
+            <span class="pipeline-stage" style="background:#3b82f6;">Fetch</span>
+            <span class="pipeline-arrow">&rarr;</span>
+            <span class="pipeline-stage" style="background:#8b5cf6;">Decode</span>
+            <span class="pipeline-arrow">&rarr;</span>
+            <span class="pipeline-stage" style="background:#a855f7;">Rename</span>
+            <span class="pipeline-arrow">&rarr;</span>
+            <span class="pipeline-stage" style="background:#d946ef;">Dispatch</span>
+            <span class="pipeline-arrow">&rarr;</span>
+            <span class="pipeline-stage" style="background:#ec4899;">Issue</span>
+            <span class="pipeline-arrow">&rarr;</span>
+            <span class="pipeline-stage" style="background:#f43f5e;">Execute</span>
+            <span class="pipeline-arrow">&rarr;</span>
+            <span class="pipeline-stage" style="background:#f97316;">Memory</span>
+            <span class="pipeline-arrow">&rarr;</span>
+            <span class="pipeline-stage" style="background:#eab308;">Writeback</span>
+            <span class="pipeline-arrow">&rarr;</span>
+            <span class="pipeline-stage" style="background:#22c55e;">Commit</span>
+        </div>
+
+        <h2>Pipeline Tracking</h2>
+
+        <p><code>PipelineTracker</code> records stage entry/exit times for each instruction. The data is exported to Konata JSON format for visualization. Per-instruction timing includes:</p>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Field</th>
+                    <th>Description</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr><td><code>fetch_cycle</code></td><td>Cycle when instruction entered the Fetch stage</td></tr>
+                <tr><td><code>decode_cycle</code></td><td>Cycle when instruction entered the Decode stage</td></tr>
+                <tr><td><code>rename_cycle</code></td><td>Cycle when instruction entered the Rename stage</td></tr>
+                <tr><td><code>dispatch_cycle</code></td><td>Cycle when instruction entered the Dispatch stage</td></tr>
+                <tr><td><code>issue_cycle</code></td><td>Cycle when instruction was issued for execution</td></tr>
+                <tr><td><code>execute_cycle</code></td><td>Cycle when instruction began executing</td></tr>
+                <tr><td><code>memory_cycle</code></td><td>Cycle when memory operation completed</td></tr>
+                <tr><td><code>writeback_cycle</code></td><td>Cycle when result was written back</td></tr>
+                <tr><td><code>commit_cycle</code></td><td>Cycle when instruction committed</td></tr>
+            </tbody>
+        </table>
+
+        <div class="page-nav">
+            <a class="nav-prev" href="01-system-overview.html">
+                <span class="nav-label">Prev</span>
+                <span class="nav-title">&larr; System Overview</span>
+            </a>
+            <a class="nav-next" href="03-ooo-engine.html">
+                <span class="nav-label">Next</span>
+                <span class="nav-title">Out-of-Order Engine &rarr;</span>
+            </a>
+        </div>
+
+        <div class="content-footer">
+            ARM CPU Emulator Cookbook &mdash; Built with C++20, CMake, and a passion for computer architecture.
+        </div>
+    </div>
+</main>
+
+<script src="../js/main.js"></script>
+</body>
+</html>

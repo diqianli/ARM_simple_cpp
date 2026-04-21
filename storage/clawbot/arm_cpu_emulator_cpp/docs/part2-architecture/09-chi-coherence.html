@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CHI Coherence Protocol - ARM CPU Emulator Cookbook</title>
+    <link rel="stylesheet" href="../css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>body { font-family: 'Inter', var(--font-sans); }</style>
+</head>
+<body>
+
+<header class="site-header">
+    <a class="header-logo" href="../index.html">
+        <span class="logo-icon">&#x1F9E0;</span>
+        ARM CPU Emulator Cookbook
+    </a>
+    <div class="header-search">
+        <span class="search-icon">&#x1F50D;</span>
+        <input type="text" placeholder="Search docs... (Ctrl+K)" autocomplete="off">
+        <div class="search-results"></div>
+    </div>
+    <button class="menu-toggle" aria-label="Toggle menu">&#9776;</button>
+</header>
+
+<nav class="sidebar" id="sidebar">
+    <div class="nav-section">
+        <div class="nav-section-title">Part 1 &mdash; Usage Guide</div>
+        <a class="nav-item" href="../part1-usage/01-quick-start.html">1. Quick Start</a>
+        <a class="nav-item" href="../part1-usage/02-cli-reference.html">2. CLI Reference</a>
+        <a class="nav-item" href="../part1-usage/03-input-formats.html">3. Input Formats</a>
+        <a class="nav-item" href="../part1-usage/04-writing-test-programs.html">4. Writing Test Programs</a>
+        <a class="nav-item" href="../part1-usage/05-running-simulations.html">5. Running Simulations</a>
+        <a class="nav-item" href="../part1-usage/06-output-analysis.html">6. Output &amp; Analysis</a>
+        <a class="nav-item" href="../part1-usage/07-visualization.html">7. Visualization</a>
+        <a class="nav-item" href="../part1-usage/08-configuration-presets.html">8. Configuration Presets</a>
+        <a class="nav-item" href="../part1-usage/09-benchmarks.html">9. Benchmarks</a>
+        <a class="nav-item" href="../part1-usage/10-automation-scripts.html">10. Automation Scripts</a>
+        <a class="nav-item" href="../part1-usage/11-faq.html">11. FAQ &amp; Troubleshooting</a>
+    </div>
+    <div class="nav-section">
+        <div class="nav-section-title">Part 2 &mdash; Architecture</div>
+        <a class="nav-item" href="../part2-architecture/01-system-overview.html">1. System Overview</a>
+        <a class="nav-item" href="../part2-architecture/02-cpu-pipeline.html">2. CPU Pipeline</a>
+        <a class="nav-item" href="../part2-architecture/03-ooo-engine.html">3. Out-of-Order Engine</a>
+        <a class="nav-item" href="../part2-architecture/04-instruction-decoder.html">4. Instruction Decoder</a>
+        <a class="nav-item" href="../part2-architecture/05-memory-hierarchy.html">5. Memory Hierarchy</a>
+        <a class="nav-item" href="../part2-architecture/06-elf-loader.html">6. ELF Loader</a>
+        <a class="nav-item" href="../part2-architecture/07-statistics.html">7. Statistics</a>
+        <a class="nav-item" href="../part2-architecture/08-visualization-system.html">8. Visualization System</a>
+        <a class="nav-item active" href="../part2-architecture/09-chi-coherence.html">9. CHI Coherence</a>
+        <a class="nav-item" href="../part2-architecture/10-type-system.html">10. Type System</a>
+        <a class="nav-item" href="../part2-architecture/11-input-sources.html">11. Input Sources</a>
+        <a class="nav-item" href="../part2-architecture/12-gem5-comparison.html">12. GEM5 Comparison</a>
+    </div>
+</nav>
+
+<main class="main-content">
+    <div class="content-wrapper">
+
+        <div class="breadcrumb">
+            <a href="../index.html">Home</a>
+            <span class="sep">&rsaquo;</span>
+            <a href="../index.html">Architecture</a>
+            <span class="sep">&rsaquo;</span>
+            CHI Coherence
+        </div>
+
+        <div class="page-header">
+            <h1>CHI Coherence Protocol</h1>
+            <p class="page-desc">Implementation of the AMBA CHI (Coherent Hub Interface) cache coherence protocol for multi-core cache consistency modeling.</p>
+        </div>
+
+        <p>The simulator implements the AMBA CHI (Coherent Hub Interface) cache coherence protocol, providing a realistic model of cache coherence traffic in ARM-based multi-core systems. The implementation is in <code>chi/chi_manager.hpp</code>.</p>
+
+        <div class="callout callout-info">
+            <div class="callout-title">Disabled by default</div>
+            <p>CHI coherence is <strong>disabled by default</strong> for single-core simulations. Enable it with <code>--enable-chi</code> on the command line or set <code>CPUConfig::enable_chi = true</code> programmatically.</p>
+        </div>
+
+        <h2>CHI Node Types</h2>
+
+        <p>The CHI protocol models three node types, each representing a different role in the coherence hierarchy:</p>
+
+        <h3>1. RN-F (Requesting Node - Fully coherent)</h3>
+        <p>Represents the CPU core's cache controller. It issues read and write requests to the interconnect and handles the following transactions:</p>
+        <ul>
+            <li><strong>Role:</strong> Issues read/write requests to the interconnect</li>
+            <li><strong>Node ID:</strong> Configurable via <code>chi_rnf_node_id</code> (default: 0)</li>
+            <li><strong>Request types:</strong> ReadShared, ReadClean, ReadNotSharedDirty, WriteLineUnique, MakeUnique</li>
+        </ul>
+
+        <h3>2. HN-F (Home Node - Fully coherent)</h3>
+        <p>Acts as the directory-based coherence manager, maintaining cache line state information:</p>
+        <ul>
+            <li><strong>Role:</strong> Directory-based coherence manager</li>
+            <li><strong>Maintains:</strong> Cache line state directory</li>
+            <li><strong>Handles:</strong> Snoops and data responses</li>
+            <li><strong>Node ID:</strong> Configurable via <code>chi_hnf_node_id</code> (default: 1)</li>
+            <li><strong>Directory size:</strong> Configurable via <code>chi_directory_size</code> (default: 4096 entries)</li>
+        </ul>
+
+        <h3>3. SN-F (Snoop Node - Fully coherent)</h3>
+        <p>Handles snoop requests from the HN-F and provides data for cache-to-cache transfers:</p>
+        <ul>
+            <li><strong>Role:</strong> Handles snoop requests from HN-F</li>
+            <li><strong>Provides:</strong> Data for cache-to-cache transfers</li>
+            <li><strong>Node ID:</strong> Configurable via <code>chi_snf_node_id</code> (default: 2)</li>
+        </ul>
+
+        <h2>Protocol State Machine</h2>
+
+        <p>Cache lines transition through CHI coherence states as requests are processed:</p>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>State</th>
+                    <th>Description</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>Invalid</strong></td>
+                    <td>Line not present in the cache</td>
+                </tr>
+                <tr>
+                    <td><strong>Shared (S)</strong></td>
+                    <td>Clean copy; may exist in multiple caches simultaneously</td>
+                </tr>
+                <tr>
+                    <td><strong>Unique (U)</strong></td>
+                    <td>Only copy in the system; clean</td>
+                </tr>
+                <tr>
+                    <td><strong>UniqueDirty (UD)</strong></td>
+                    <td>Only copy in the system; modified (dirty)</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>CHI Configuration Parameters</h2>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Parameter</th>
+                    <th>Default</th>
+                    <th>Description</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><code>enable_chi</code></td>
+                    <td><code>false</code></td>
+                    <td>Enable CHI protocol</td>
+                </tr>
+                <tr>
+                    <td><code>chi_request_latency</code></td>
+                    <td>2 cycles</td>
+                    <td>Request transmission latency</td>
+                </tr>
+                <tr>
+                    <td><code>chi_response_latency</code></td>
+                    <td>2 cycles</td>
+                    <td>Response transmission latency</td>
+                </tr>
+                <tr>
+                    <td><code>chi_data_latency</code></td>
+                    <td>4 cycles</td>
+                    <td>Data transfer latency</td>
+                </tr>
+                <tr>
+                    <td><code>chi_snoop_latency</code></td>
+                    <td>2 cycles</td>
+                    <td>Snoop round-trip latency</td>
+                </tr>
+                <tr>
+                    <td><code>chi_max_pcrd_credits</code></td>
+                    <td>16</td>
+                    <td>Max PCR (Protocol Credit) credits</td>
+                </tr>
+                <tr>
+                    <td><code>chi_max_outstanding_dbid</code></td>
+                    <td>32</td>
+                    <td>Max outstanding data buffer IDs</td>
+                </tr>
+                <tr>
+                    <td><code>chi_max_retry_queue_size</code></td>
+                    <td>64</td>
+                    <td>Max retry queue entries</td>
+                </tr>
+                <tr>
+                    <td><code>chi_directory_size</code></td>
+                    <td>4096</td>
+                    <td>Directory entries</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>CHI Request Types</h2>
+
+        <p>The protocol supports the following request types, each representing a specific coherence transaction:</p>
+
+        <pre><code class="language-cpp">enum class ChiRequestType {
+    ReadShared,         // Read for sharing
+    ReadClean,          // Read expecting clean data
+    ReadNotSharedDirty, // Read with intent to modify
+    WriteLineUnique,    // Write full cache line
+    MakeUnique,         // Upgrade to unique
+    CleanShared,        // Evict shared line
+    MakeInvalid,        // Evict unique/dirty line
+};</code></pre>
+
+        <h2>QoS (Quality of Service)</h2>
+
+        <p>The CHI implementation includes flow control mechanisms to manage interconnect bandwidth:</p>
+        <ul>
+            <li><strong>PCR credit-based flow control:</strong> Limits the number of in-flight requests using Protocol Credit (PCR) credits, preventing interconnect congestion.</li>
+            <li><strong>Outstanding request limiting:</strong> Caps the number of concurrent data buffer IDs (<code>chi_max_outstanding_dbid</code>) to bound resource usage.</li>
+            <li><strong>Retry queue for back-pressure:</strong> When credits are exhausted or the interconnect is congested, requests are placed in a retry queue (<code>chi_max_retry_queue_size</code>) and re-issued when bandwidth becomes available.</li>
+        </ul>
+
+        <div class="page-nav">
+            <a class="nav-prev" href="08-visualization-system.html">
+                <span class="nav-label">Prev</span>
+                <span class="nav-title">&larr; Visualization System</span>
+            </a>
+            <a class="nav-next" href="10-type-system.html">
+                <span class="nav-label">Next</span>
+                <span class="nav-title">Type System &rarr;</span>
+            </a>
+        </div>
+
+        <div class="content-footer">
+            ARM CPU Emulator Cookbook &mdash; Built with C++20, CMake, and a passion for computer architecture.
+        </div>
+    </div>
+</main>
+
+<script src="../js/main.js"></script>
+</body>
+</html>

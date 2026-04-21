@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CLI Reference - ARM CPU Emulator Cookbook</title>
+    <link rel="stylesheet" href="../css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>body { font-family: 'Inter', var(--font-sans); }</style>
+</head>
+<body>
+
+<header class="site-header">
+    <a class="header-logo" href="../index.html">
+        <span class="logo-icon">&#x1F9E0;</span>
+        ARM CPU Emulator Cookbook
+    </a>
+    <div class="header-search">
+        <span class="search-icon">&#x1F50D;</span>
+        <input type="text" placeholder="Search docs... (Ctrl+K)" autocomplete="off">
+        <div class="search-results"></div>
+    </div>
+    <button class="menu-toggle" aria-label="Toggle menu">&#9776;</button>
+</header>
+
+<nav class="sidebar" id="sidebar">
+    <div class="nav-section">
+        <div class="nav-section-title">Part 1 &mdash; Usage Guide</div>
+        <a class="nav-item" href="../part1-usage/01-quick-start.html">1. Quick Start</a>
+        <a class="nav-item active" href="../part1-usage/02-cli-reference.html">2. CLI Reference</a>
+        <a class="nav-item" href="../part1-usage/03-input-formats.html">3. Input Formats</a>
+        <a class="nav-item" href="../part1-usage/04-writing-test-programs.html">4. Writing Test Programs</a>
+        <a class="nav-item" href="../part1-usage/05-running-simulations.html">5. Running Simulations</a>
+        <a class="nav-item" href="../part1-usage/06-output-analysis.html">6. Output &amp; Analysis</a>
+        <a class="nav-item" href="../part1-usage/07-visualization.html">7. Visualization</a>
+        <a class="nav-item" href="../part1-usage/08-configuration-presets.html">8. Configuration Presets</a>
+        <a class="nav-item" href="../part1-usage/09-benchmarks.html">9. Benchmarks</a>
+        <a class="nav-item" href="../part1-usage/10-automation-scripts.html">10. Automation Scripts</a>
+        <a class="nav-item" href="../part1-usage/11-faq.html">11. FAQ &amp; Troubleshooting</a>
+    </div>
+    <div class="nav-section">
+        <div class="nav-section-title">Part 2 &mdash; Architecture</div>
+        <a class="nav-item" href="../part2-architecture/01-system-overview.html">1. System Overview</a>
+        <a class="nav-item" href="../part2-architecture/02-cpu-pipeline.html">2. CPU Pipeline</a>
+        <a class="nav-item" href="../part2-architecture/03-ooo-engine.html">3. Out-of-Order Engine</a>
+        <a class="nav-item" href="../part2-architecture/04-instruction-decoder.html">4. Instruction Decoder</a>
+        <a class="nav-item" href="../part2-architecture/05-memory-hierarchy.html">5. Memory Hierarchy</a>
+        <a class="nav-item" href="../part2-architecture/06-elf-loader.html">6. ELF Loader</a>
+        <a class="nav-item" href="../part2-architecture/07-statistics.html">7. Statistics</a>
+        <a class="nav-item" href="../part2-architecture/08-visualization-system.html">8. Visualization System</a>
+        <a class="nav-item" href="../part2-architecture/09-chi-coherence.html">9. CHI Coherence</a>
+        <a class="nav-item" href="../part2-architecture/10-type-system.html">10. Type System</a>
+        <a class="nav-item" href="../part2-architecture/11-input-sources.html">11. Input Sources</a>
+        <a class="nav-item" href="../part2-architecture/12-gem5-comparison.html">12. GEM5 Comparison</a>
+    </div>
+</nav>
+
+<main class="main-content">
+    <div class="content-wrapper">
+
+        <div class="breadcrumb">
+            <a href="../index.html">Home</a>
+            <span class="sep">&rsaquo;</span>
+            <a href="../index.html">Usage Guide</a>
+            <span class="sep">&rsaquo;</span>
+            CLI Reference
+        </div>
+
+        <div class="page-header">
+            <h1>CLI Reference</h1>
+            <p class="page-desc">Complete command-line interface reference for the ARM CPU Emulator simulator binary.</p>
+        </div>
+
+        <h2>Quick Reference</h2>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Flag</th>
+                    <th>Default</th>
+                    <th>Description</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr><td><code>-f, --format &lt;type&gt;</code></td><td><code>text</code></td><td>Input format (elf, text, champsim, champsim_xz, json)</td></tr>
+                <tr><td><code>&lt;trace_file&gt;</code></td><td>&mdash;</td><td>Path to trace/ELF file (positional argument)</td></tr>
+                <tr><td><code>-n, --max-instructions &lt;N&gt;</code></td><td><code>0</code></td><td>Max instructions to simulate (0 = all)</td></tr>
+                <tr><td><code>-s, --skip-instructions &lt;N&gt;</code></td><td><code>0</code></td><td>Skip first N instructions</td></tr>
+                <tr><td><code>-c, --max-cycles &lt;N&gt;</code></td><td><code>1000000</code></td><td>Max simulation cycles</td></tr>
+                <tr><td><code>--window-size &lt;N&gt;</code></td><td><code>128</code></td><td>Reorder buffer / instruction window size</td></tr>
+                <tr><td><code>--fetch-width &lt;N&gt;</code></td><td><code>8</code></td><td>Instructions fetched per cycle</td></tr>
+                <tr><td><code>--issue-width &lt;N&gt;</code></td><td><code>4</code></td><td>Instructions issued per cycle</td></tr>
+                <tr><td><code>--commit-width &lt;N&gt;</code></td><td><code>4</code></td><td>Instructions committed per cycle</td></tr>
+                <tr><td><code>--l1-size &lt;KB&gt;</code></td><td><code>64</code></td><td>L1 data cache size in KB</td></tr>
+                <tr><td><code>--l2-size &lt;KB&gt;</code></td><td><code>512</code></td><td>L2 cache size in KB</td></tr>
+                <tr><td><code>--l3-size &lt;KB&gt;</code></td><td><code>8192</code></td><td>L3 cache size in KB</td></tr>
+                <tr><td><code>--frequency &lt;MHz&gt;</code></td><td><code>2000</code></td><td>CPU clock frequency in MHz</td></tr>
+                <tr><td><code>-o, --output &lt;path&gt;</code></td><td><code>output.json</code></td><td>Output JSON file path</td></tr>
+                <tr><td><code>-j, --json-metrics</code></td><td>&mdash;</td><td>Emit metrics JSON to stdout</td></tr>
+                <tr><td><code>--save-trace</code></td><td>&mdash;</td><td>Save detailed execution trace</td></tr>
+                <tr><td><code>--dump-range &lt;start&gt;:&lt;end&gt;</code></td><td>&mdash;</td><td>Dump pipeline trace for instruction range</td></tr>
+                <tr><td><code>-p, --port &lt;port&gt;</code></td><td>&mdash;</td><td>Start web server for visualization</td></tr>
+                <tr><td><code>-e, --event-mode</code></td><td>&mdash;</td><td>Event-driven mode (no visualization, no Konata export)</td></tr>
+                <tr><td><code>--multi-instance</code></td><td>&mdash;</td><td>Enable multi-instance mode</td></tr>
+                <tr><td><code>--num-instances &lt;N&gt;</code></td><td><code>4</code></td><td>Number of simulation instances</td></tr>
+                <tr><td><code>--num-threads &lt;N&gt;</code></td><td>auto</td><td>Number of threads</td></tr>
+                <tr><td><code>--preset &lt;name&gt;</code></td><td>&mdash;</td><td>Config preset (default, high_performance, minimal, gem5_o3_arm_v7a)</td></tr>
+                <tr><td><code>-m, --memory-size &lt;MB&gt;</code></td><td><code>256</code></td><td>Memory size for ELF simulation</td></tr>
+                <tr><td><code>--viz-format &lt;fmt&gt;</code></td><td>&mdash;</td><td>Visualization format (konata, perf)</td></tr>
+                <tr><td><code>-v, --verbose</code></td><td>&mdash;</td><td>Verbose output</td></tr>
+            </tbody>
+        </table>
+
+        <h2>Usage Syntax</h2>
+
+        <pre><code>arm_cpu_sim [options] &lt;trace_file&gt;</code></pre>
+
+        <p>The trace file is provided as a positional argument. All other parameters are passed as flags. Options can appear in any order relative to the trace file.</p>
+
+        <h2>Input Control</h2>
+
+        <p>These options control how the simulator reads and processes input instructions.</p>
+
+        <div class="cli-table">
+            <div class="cli-row">
+                <div class="cli-flag"><code>-f, --format &lt;type&gt;</code></div>
+                <div class="cli-desc">Select the input format. Supported values: <code>elf</code>, <code>text</code>, <code>champsim</code>, <code>champsim_xz</code>, <code>json</code>. Default is <code>text</code>. See <a href="03-input-formats.html">Input Formats</a> for details on each format.</div>
+            </div>
+            <div class="cli-row">
+                <div class="cli-flag"><code>&lt;trace_file&gt;</code></div>
+                <div class="cli-desc">Positional argument specifying the path to the input file (ELF binary, text trace, ChampSim trace, or JSON trace). This is the only required argument for running a simulation.</div>
+            </div>
+            <div class="cli-row">
+                <div class="cli-flag"><code>-n, --max-instructions &lt;N&gt;</code></div>
+                <div class="cli-desc">Maximum number of instructions to simulate. A value of <code>0</code> (default) means simulate all instructions in the input. Useful for quick benchmarking or limiting simulation time.</div>
+            </div>
+            <div class="cli-row">
+                <div class="cli-flag"><code>-s, --skip-instructions &lt;N&gt;</code></div>
+                <div class="cli-desc">Skip the first N instructions from the input before starting the simulation. Useful for skipping initialization code or warm-up phases. Default is <code>0</code>.</div>
+            </div>
+            <div class="cli-row">
+                <div class="cli-flag"><code>-c, --max-cycles &lt;N&gt;</code></div>
+                <div class="cli-desc">Maximum number of simulation cycles before the simulator terminates. Acts as a safety limit to prevent infinite loops. Default is <code>1000000</code> (1M cycles).</div>
+            </div>
+        </div>
+
+        <h2>CPU Configuration</h2>
+
+        <p>These options configure the microarchitectural parameters of the simulated CPU pipeline.</p>
+
+        <div class="cli-table">
+            <div class="cli-row">
+                <div class="cli-flag"><code>--window-size &lt;N&gt;</code></div>
+                <div class="cli-desc">Size of the reorder buffer (ROB) / instruction window. This determines how many instructions can be in-flight simultaneously. Larger values allow more instruction-level parallelism but increase resource usage. Default is <code>128</code>.</div>
+            </div>
+            <div class="cli-row">
+                <div class="cli-flag"><code>--fetch-width &lt;N&gt;</code></div>
+                <div class="cli-desc">Number of instructions fetched per cycle from the instruction stream. Default is <code>8</code>. Typical values range from 4 (in-order cores) to 8 (wide superscalar).</div>
+            </div>
+            <div class="cli-row">
+                <div class="cli-flag"><code>--issue-width &lt;N&gt;</code></div>
+                <div class="cli-desc">Maximum number of instructions issued to execution units per cycle. Default is <code>4</code>. This is the peak issue bandwidth of the scheduler.</div>
+            </div>
+            <div class="cli-row">
+                <div class="cli-flag"><code>--commit-width &lt;N&gt;</code></div>
+                <div class="cli-desc">Maximum number of instructions committed per cycle from the ROB. Default is <code>4</code>. Usually matches the issue width in practical configurations.</div>
+            </div>
+        </div>
+
+        <div class="callout callout-tip">
+            <div class="callout-title">Presets override individual settings</div>
+            <p>Using <code>--preset &lt;name&gt;</code> will override any individually specified CPU and memory configuration parameters. Apply presets first, then override specific values if needed.</p>
+        </div>
+
+        <h2>Memory Configuration</h2>
+
+        <p>These options configure the cache hierarchy and memory subsystem timing.</p>
+
+        <div class="cli-table">
+            <div class="cli-row">
+                <div class="cli-flag"><code>--l1-size &lt;KB&gt;</code></div>
+                <div class="cli-desc">L1 data cache size in kilobytes. Default is <code>64</code> KB. The L1 cache is the closest cache to the CPU core with the lowest latency.</div>
+            </div>
+            <div class="cli-row">
+                <div class="cli-flag"><code>--l2-size &lt;KB&gt;</code></div>
+                <div class="cli-desc">L2 cache size in kilobytes. Default is <code>512</code> KB. The L2 cache serves as a mid-level cache between L1 and L3.</div>
+            </div>
+            <div class="cli-row">
+                <div class="cli-flag"><code>--l3-size &lt;KB&gt;</code></div>
+                <div class="cli-desc">L3 (last-level) cache size in kilobytes. Default is <code>8192</code> KB (8 MB). The L3 cache is shared across cores in multi-core configurations.</div>
+            </div>
+            <div class="cli-row">
+                <div class="cli-flag"><code>--frequency &lt;MHz&gt;</code></div>
+                <div class="cli-desc">CPU clock frequency in MHz. Default is <code>2000</code> MHz (2 GHz). This value is used for calculating timing metrics and power estimates.</div>
+            </div>
+        </div>
+
+        <h2>Output Control</h2>
+
+        <p>These options control what output the simulator produces and where it is written.</p>
+
+        <div class="cli-table">
+            <div class="cli-row">
+                <div class="cli-flag"><code>-o, --output &lt;path&gt;</code></div>
+                <div class="cli-desc">Path for the output JSON file. This file contains simulation statistics, pipeline trace data, and Konata visualization data. Default is <code>output.json</code> in the current working directory.</div>
+            </div>
+            <div class="cli-row">
+                <div class="cli-flag"><code>-j, --json-metrics</code></div>
+                <div class="cli-desc">Also emit a summary of performance metrics as JSON to standard output (stdout). Useful for programmatic consumption and scripting pipelines.</div>
+            </div>
+            <div class="cli-row">
+                <div class="cli-flag"><code>--save-trace</code></div>
+                <div class="cli-desc">Enable saving of the detailed execution trace in the output file. This includes per-instruction timing information and pipeline stage transitions.</div>
+            </div>
+            <div class="cli-row">
+                <div class="cli-flag"><code>--dump-range &lt;start&gt;:&lt;end&gt;</code></div>
+                <div class="cli-desc">Dump the pipeline trace only for instructions in the specified range (inclusive). Format is <code>start:end</code>. For example, <code>--dump-range 100:200</code> dumps instructions 100 through 200. Useful for debugging specific instruction sequences.</div>
+            </div>
+        </div>
+
+        <h2>Visualization</h2>
+
+        <p>These options control the visualization and web server features.</p>
+
+        <div class="cli-table">
+            <div class="cli-row">
+                <div class="cli-flag"><code>-p, --port &lt;port&gt;</code></div>
+                <div class="cli-desc">Start a built-in HTTP server on the specified port to serve the Konata visualization interface. Open <code>http://localhost:&lt;port&gt;</code> in your browser to view the pipeline timeline. The visualization page loads automatically with the simulation output.</div>
+            </div>
+            <div class="cli-row">
+                <div class="cli-flag"><code>-e, --event-mode</code></div>
+                <div class="cli-desc">Enable event-driven (SimulationEngine) mode. In this mode, the simulator emits <code>SimulationEvent</code> objects to pluggable sinks instead of running the full CPUEmulator path. This disables Konata visualization export and is intended for analytical use cases.</div>
+            </div>
+            <div class="cli-row">
+                <div class="cli-flag"><code>--viz-format &lt;fmt&gt;</code></div>
+                <div class="cli-desc">Select the visualization output format. Supported values: <code>konata</code> (Konata pipeline timeline JSON), <code>perf</code> (performance statistics format). Default format is Konata.</div>
+            </div>
+        </div>
+
+        <h2>Multi-Instance</h2>
+
+        <p>These options enable running multiple independent simulation instances in parallel, useful for design space exploration.</p>
+
+        <div class="cli-table">
+            <div class="cli-row">
+                <div class="cli-flag"><code>--multi-instance</code></div>
+                <div class="cli-desc">Enable multi-instance simulation mode. Each instance runs with its own independent configuration and input. Requires specifying <code>--num-instances</code> and providing separate input files.</div>
+            </div>
+            <div class="cli-row">
+                <div class="cli-flag"><code>--num-instances &lt;N&gt;</code></div>
+                <div class="cli-desc">Number of simulation instances to run. Default is <code>4</code>. Only effective when <code>--multi-instance</code> is enabled.</div>
+            </div>
+            <div class="cli-row">
+                <div class="cli-flag"><code>--num-threads &lt;N&gt;</code></div>
+                <div class="cli-desc">Number of threads to use for parallel execution. Default is auto-detected based on available CPU cores. Can be set explicitly for finer control.</div>
+            </div>
+        </div>
+
+        <h2>Presets</h2>
+
+        <div class="cli-table">
+            <div class="cli-row">
+                <div class="cli-flag"><code>--preset &lt;name&gt;</code></div>
+                <div class="cli-desc">Apply a named configuration preset that sets CPU pipeline, cache, and memory parameters in one step. Available presets:</div>
+            </div>
+        </div>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Preset Name</th>
+                    <th>Description</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><code>default</code></td>
+                    <td>Balanced configuration: 128-entry ROB, 8-wide fetch, 4-wide issue/commit, 64 KB L1, 512 KB L2, 8 MB L3</td>
+                </tr>
+                <tr>
+                    <td><code>high_performance</code></td>
+                    <td>Aggressive out-of-order configuration with larger windows and caches for maximum IPC</td>
+                </tr>
+                <tr>
+                    <td><code>minimal</code></td>
+                    <td>Minimal configuration with small structures, suitable for fast simulation turnaround</td>
+                </tr>
+                <tr>
+                    <td><code>gem5_o3_arm_v7a</code></td>
+                    <td>Configuration matching gem5's O3 ARM v7a CPU model for cross-simulator comparison</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <div class="callout callout-info">
+            <div class="callout-title">Combining presets with individual options</div>
+            <p>Preset values are applied first, then any explicitly specified flags override the corresponding preset values. For example, <code>--preset high_performance --l1-size 32</code> uses the high_performance preset but overrides L1 size to 32 KB.</p>
+        </div>
+
+        <h2>Other Options</h2>
+
+        <div class="cli-table">
+            <div class="cli-row">
+                <div class="cli-flag"><code>-m, --memory-size &lt;MB&gt;</code></div>
+                <div class="cli-desc">Total simulated memory size in megabytes for ELF simulation. Default is <code>256</code> MB. This is the size of the simulated physical address space available to the loaded ELF program. Increase this value if your program accesses large memory regions.</div>
+            </div>
+            <div class="cli-row">
+                <div class="cli-flag"><code>-t, --threads &lt;N&gt;</code></div>
+                <div class="cli-desc"><span class="badge badge-red">DEPRECATED</span> Use <code>--num-threads &lt;N&gt;</code> instead. This flag is retained for backward compatibility but may be removed in a future version.</div>
+            </div>
+            <div class="cli-row">
+                <div class="cli-flag"><code>-v, --verbose</code></div>
+                <div class="cli-desc">Enable verbose output. Prints additional information during simulation including per-cycle status, cache events, and pipeline stage transitions. Useful for debugging and understanding simulator behavior.</div>
+            </div>
+        </div>
+
+        <h2>Example Commands</h2>
+
+        <h3>Basic ELF simulation</h3>
+        <pre><code>./build/arm_cpu_sim -f elf tests/data/test_elf_aarch64</code></pre>
+
+        <h3>Limited simulation with custom output</h3>
+        <pre><code>./build/arm_cpu_sim -f elf program.elf -n 10000 -o results/run1.json</code></pre>
+
+        <h3>High-performance CPU configuration</h3>
+        <pre><code>./build/arm_cpu_sim -f elf program.elf --preset high_performance -o results/hp.json</code></pre>
+
+        <h3>Custom pipeline with visualization server</h3>
+        <pre><code>./build/arm_cpu_sim -f elf program.elf \
+  --window-size 256 --issue-width 6 --commit-width 6 \
+  --l1-size 128 --l2-size 1024 \
+  -p 8080 -o results/custom.json</code></pre>
+
+        <h3>Event-driven mode with JSON metrics</h3>
+        <pre><code>./build/arm_cpu_sim -e -f elf program.elf -j</code></pre>
+
+        <h3>Debug specific instruction range</h3>
+        <pre><code>./build/arm_cpu_sim -f elf program.elf --dump-range 50:100 -v</code></pre>
+
+        <div class="page-nav">
+            <a href="01-quick-start.html">
+                <span class="nav-label">Previous</span>
+                <span class="nav-title">&larr; Quick Start</span>
+            </a>
+            <a class="nav-next" href="03-input-formats.html">
+                <span class="nav-label">Next</span>
+                <span class="nav-title">Input Formats &rarr;</span>
+            </a>
+        </div>
+
+        <div class="content-footer">
+            ARM CPU Emulator Cookbook &mdash; Built with C++20, CMake, and a passion for computer architecture.
+        </div>
+    </div>
+</main>
+
+<script src="../js/main.js"></script>
+</body>
+</html>

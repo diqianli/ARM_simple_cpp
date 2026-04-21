@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ELF Loader - ARM CPU Emulator Cookbook</title>
+    <link rel="stylesheet" href="../css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>body { font-family: 'Inter', var(--font-sans); }</style>
+</head>
+<body>
+
+<header class="site-header">
+    <a class="header-logo" href="../index.html">
+        <span class="logo-icon">&#x1F9E0;</span>
+        ARM CPU Emulator Cookbook
+    </a>
+    <div class="header-search">
+        <span class="search-icon">&#x1F50D;</span>
+        <input type="text" placeholder="Search docs... (Ctrl+K)" autocomplete="off">
+        <div class="search-results"></div>
+    </div>
+    <button class="menu-toggle" aria-label="Toggle menu">&#9776;</button>
+</header>
+
+<nav class="sidebar" id="sidebar">
+    <div class="nav-section">
+        <div class="nav-section-title">Part 1 &mdash; Usage Guide</div>
+        <a class="nav-item" href="../part1-usage/01-quick-start.html">1. Quick Start</a>
+        <a class="nav-item" href="../part1-usage/02-cli-reference.html">2. CLI Reference</a>
+        <a class="nav-item" href="../part1-usage/03-input-formats.html">3. Input Formats</a>
+        <a class="nav-item" href="../part1-usage/04-writing-test-programs.html">4. Writing Test Programs</a>
+        <a class="nav-item" href="../part1-usage/05-running-simulations.html">5. Running Simulations</a>
+        <a class="nav-item" href="../part1-usage/06-output-analysis.html">6. Output &amp; Analysis</a>
+        <a class="nav-item" href="../part1-usage/07-visualization.html">7. Visualization</a>
+        <a class="nav-item" href="../part1-usage/08-configuration-presets.html">8. Configuration Presets</a>
+        <a class="nav-item" href="../part1-usage/09-benchmarks.html">9. Benchmarks</a>
+        <a class="nav-item" href="../part1-usage/10-automation-scripts.html">10. Automation Scripts</a>
+        <a class="nav-item" href="../part1-usage/11-faq.html">11. FAQ &amp; Troubleshooting</a>
+    </div>
+    <div class="nav-section">
+        <div class="nav-section-title">Part 2 &mdash; Architecture</div>
+        <a class="nav-item" href="../part2-architecture/01-system-overview.html">1. System Overview</a>
+        <a class="nav-item" href="../part2-architecture/02-cpu-pipeline.html">2. CPU Pipeline</a>
+        <a class="nav-item" href="../part2-architecture/03-ooo-engine.html">3. Out-of-Order Engine</a>
+        <a class="nav-item" href="../part2-architecture/04-instruction-decoder.html">4. Instruction Decoder</a>
+        <a class="nav-item" href="../part2-architecture/05-memory-hierarchy.html">5. Memory Hierarchy</a>
+        <a class="nav-item active" href="../part2-architecture/06-elf-loader.html">6. ELF Loader</a>
+        <a class="nav-item" href="../part2-architecture/07-statistics.html">7. Statistics</a>
+        <a class="nav-item" href="../part2-architecture/08-visualization-system.html">8. Visualization System</a>
+        <a class="nav-item" href="../part2-architecture/09-chi-coherence.html">9. CHI Coherence</a>
+        <a class="nav-item" href="../part2-architecture/10-type-system.html">10. Type System</a>
+        <a class="nav-item" href="../part2-architecture/11-input-sources.html">11. Input Sources</a>
+        <a class="nav-item" href="../part2-architecture/12-gem5-comparison.html">12. GEM5 Comparison</a>
+    </div>
+</nav>
+
+<main class="main-content">
+    <div class="content-wrapper">
+
+        <div class="breadcrumb">
+            <a href="../index.html">Home</a>
+            <span class="sep">&rsaquo;</span>
+            <a href="../index.html">Architecture</a>
+            <span class="sep">&rsaquo;</span>
+            ELF Loader
+        </div>
+
+        <div class="page-header">
+            <h1>ELF Loader</h1>
+            <p class="page-desc">Parses ELF64 little-endian binaries for ARM64 execution, mapping segments into simulated memory and resolving symbols.</p>
+        </div>
+
+        <p>Source files: <code>elf/elf_loader.hpp</code>, <code>elf/elf_loader.cpp</code></p>
+
+        <h2>ELF Parsing</h2>
+
+        <p>The ELF loader performs three stages of parsing:</p>
+
+        <ul>
+            <li><strong>ELF Header</strong> &mdash; Validates the magic number (<code>\x7fELF</code>), class (64-bit), endianness (little-endian), and machine type (AArch64). Rejects binaries that do not match these criteria.</li>
+            <li><strong>Program Headers</strong> &mdash; Identifies <code>PT_LOAD</code> segments that need to be mapped into simulated memory. Each program header specifies the virtual address, file offset, and size of the segment.</li>
+            <li><strong>Section Headers</strong> &mdash; Reads section metadata for symbol resolution, string tables, and debug information.</li>
+        </ul>
+
+        <h2>Segment Loading</h2>
+
+        <p><code>PT_LOAD</code> segments are loaded into simulated memory with the following permission handling:</p>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Flag</th>
+                    <th>Constant</th>
+                    <th>Segment Type</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><code>PF_X</code></td>
+                    <td>0x1</td>
+                    <td>Executable (code segment)</td>
+                </tr>
+                <tr>
+                    <td><code>PF_W</code></td>
+                    <td>0x2</td>
+                    <td>Writable (data segment)</td>
+                </tr>
+                <tr>
+                    <td><code>PF_R</code></td>
+                    <td>0x4</td>
+                    <td>Readable (all segments)</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <p>Virtual addresses from the ELF file are mapped directly into the simulator's memory space. The total memory size is configurable via the <code>-m</code> flag (default: 256 MB).</p>
+
+        <div class="callout callout-tip">
+            <div class="callout-title">Memory size configuration</div>
+            <p>Use <code>-m &lt;MB&gt;</code> to set the simulated memory size. If your program accesses large memory regions, increase this value. For example: <code>-m 1024</code> for 1 GB of simulated memory.</p>
+        </div>
+
+        <h2>Symbol Resolution</h2>
+
+        <p>The loader parses symbol tables to enable named lookups and address-to-name mapping:</p>
+
+        <ul>
+            <li>Parses <code>.symtab</code> (static) and <code>.dynsym</code> (dynamic) sections</li>
+            <li>Supports <code>STT_FUNC</code> (function symbols) and <code>STT_OBJECT</code> (data symbols)</li>
+            <li>C++ name demangling for mangled symbols (e.g., <code>_Z3foov</code> &rarr; <code>foo()</code>)</li>
+            <li>PLT (Procedure Linkage Table) symbol detection for dynamically linked functions</li>
+            <li>Symbol lookup by name and by address</li>
+        </ul>
+
+        <h2>Data Structures</h2>
+
+        <p>The loader uses the following core data structures:</p>
+
+        <pre><code>struct MemorySegment {
+    uint64_t vaddr;       // Virtual address
+    uint64_t size;        // Segment size
+    uint64_t flags;       // Permissions (R/W/X)
+    std::vector&lt;uint8_t&gt; data;  // Segment content
+};
+
+struct SymbolTable {
+    struct Symbol {
+        std::string name;
+        uint64_t address;
+        uint64_t size;
+        uint8_t type;      // STT_FUNC, STT_OBJECT, etc.
+        uint8_t binding;   // STB_LOCAL, STB_GLOBAL, etc.
+    };
+    std::vector&lt;Symbol&gt; symbols;
+};</code></pre>
+
+        <h2>Entry Point Detection</h2>
+
+        <p>The simulator determines the initial program counter (PC) using a priority-based approach:</p>
+
+        <ol>
+            <li><strong>ELF entry point field</strong> &mdash; Uses the <code>e_entry</code> field from the ELF header as the primary source</li>
+            <li><strong><code>_start</code> symbol fallback</strong> &mdash; If the entry point is 0, searches for the <code>_start</code> symbol in the symbol table</li>
+            <li><strong>Dynamic ELF support</strong> &mdash; For dynamically linked binaries, supports GOT/PLT resolution to find the actual entry point</li>
+        </ol>
+
+        <h2>Functional Simulation (FunctionalSim)</h2>
+
+        <p>Source files: <code>input/functional_sim.hpp</code>, <code>input/functional_sim.cpp</code></p>
+
+        <p>The <code>FunctionalSim</code> component is a key innovation that enables accurate timing simulation:</p>
+
+        <ul>
+            <li>Pre-executes the ELF binary to determine actual branch outcomes</li>
+            <li>Provides "perfect branch prediction" for the main timing simulator</li>
+            <li>Executes instructions functionally (no timing model) to record taken/not-taken outcomes for each branch instruction</li>
+            <li>Branch outcomes are fed to the main timing simulator, eliminating misprediction penalties from the simulation</li>
+        </ul>
+
+        <div class="callout callout-info">
+            <div class="callout-title">Why functional pre-simulation?</div>
+            <p>By running the binary functionally first, the simulator knows the exact outcome of every branch before the timing simulation begins. This isolates the memory hierarchy and pipeline effects from branch prediction quality, making it easier to study microarchitectural behavior independently.</p>
+        </div>
+
+        <div class="page-nav">
+            <a href="05-memory-hierarchy.html">
+                <span class="nav-label">Previous</span>
+                <span class="nav-title">&larr; Memory Hierarchy</span>
+            </a>
+            <a class="nav-next" href="07-statistics.html">
+                <span class="nav-label">Next</span>
+                <span class="nav-title">Statistics &rarr;</span>
+            </a>
+        </div>
+
+        <div class="content-footer">
+            ARM CPU Emulator Cookbook &mdash; Built with C++20, CMake, and a passion for computer architecture.
+        </div>
+    </div>
+</main>
+
+<script src="../js/main.js"></script>
+</body>
+</html>

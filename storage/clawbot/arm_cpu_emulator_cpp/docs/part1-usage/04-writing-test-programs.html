@@ -1,0 +1,462 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Writing Test Programs - ARM CPU Emulator Cookbook</title>
+    <link rel="stylesheet" href="../css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>body { font-family: 'Inter', var(--font-sans); }</style>
+</head>
+<body>
+
+<header class="site-header">
+    <a class="header-logo" href="../index.html">
+        <span class="logo-icon">&#x1F9E0;</span>
+        ARM CPU Emulator Cookbook
+    </a>
+    <div class="header-search">
+        <span class="search-icon">&#x1F50D;</span>
+        <input type="text" placeholder="Search docs... (Ctrl+K)" autocomplete="off">
+        <div class="search-results"></div>
+    </div>
+    <button class="menu-toggle" aria-label="Toggle menu">&#9776;</button>
+</header>
+
+<nav class="sidebar" id="sidebar">
+    <div class="nav-section">
+        <div class="nav-section-title">Part 1 &mdash; Usage Guide</div>
+        <a class="nav-item" href="../part1-usage/01-quick-start.html">1. Quick Start</a>
+        <a class="nav-item" href="../part1-usage/02-cli-reference.html">2. CLI Reference</a>
+        <a class="nav-item" href="../part1-usage/03-input-formats.html">3. Input Formats</a>
+        <a class="nav-item active" href="../part1-usage/04-writing-test-programs.html">4. Writing Test Programs</a>
+        <a class="nav-item" href="../part1-usage/05-running-simulations.html">5. Running Simulations</a>
+        <a class="nav-item" href="../part1-usage/06-output-analysis.html">6. Output &amp; Analysis</a>
+        <a class="nav-item" href="../part1-usage/07-visualization.html">7. Visualization</a>
+        <a class="nav-item" href="../part1-usage/08-configuration-presets.html">8. Configuration Presets</a>
+        <a class="nav-item" href="../part1-usage/09-benchmarks.html">9. Benchmarks</a>
+        <a class="nav-item" href="../part1-usage/10-automation-scripts.html">10. Automation Scripts</a>
+        <a class="nav-item" href="../part1-usage/11-faq.html">11. FAQ &amp; Troubleshooting</a>
+    </div>
+    <div class="nav-section">
+        <div class="nav-section-title">Part 2 &mdash; Architecture</div>
+        <a class="nav-item" href="../part2-architecture/01-system-overview.html">1. System Overview</a>
+        <a class="nav-item" href="../part2-architecture/02-cpu-pipeline.html">2. CPU Pipeline</a>
+        <a class="nav-item" href="../part2-architecture/03-ooo-engine.html">3. Out-of-Order Engine</a>
+        <a class="nav-item" href="../part2-architecture/04-instruction-decoder.html">4. Instruction Decoder</a>
+        <a class="nav-item" href="../part2-architecture/05-memory-hierarchy.html">5. Memory Hierarchy</a>
+        <a class="nav-item" href="../part2-architecture/06-elf-loader.html">6. ELF Loader</a>
+        <a class="nav-item" href="../part2-architecture/07-statistics.html">7. Statistics</a>
+        <a class="nav-item" href="../part2-architecture/08-visualization-system.html">8. Visualization System</a>
+        <a class="nav-item" href="../part2-architecture/09-chi-coherence.html">9. CHI Coherence</a>
+        <a class="nav-item" href="../part2-architecture/10-type-system.html">10. Type System</a>
+        <a class="nav-item" href="../part2-architecture/11-input-sources.html">11. Input Sources</a>
+        <a class="nav-item" href="../part2-architecture/12-gem5-comparison.html">12. GEM5 Comparison</a>
+    </div>
+</nav>
+
+<main class="main-content">
+    <div class="content-wrapper">
+
+        <div class="breadcrumb">
+            <a href="../index.html">Home</a>
+            <span class="sep">&rsaquo;</span>
+            <a href="../index.html">Usage Guide</a>
+            <span class="sep">&rsaquo;</span>
+            Writing Test Programs
+        </div>
+
+        <div class="page-header">
+            <h1>Writing Test Programs</h1>
+            <p class="page-desc">How to write bare-metal ARM64 assembly and C programs for the simulator, covering instruction patterns, compilation, and execution environment details.</p>
+        </div>
+
+        <h2>Bare-Metal ARM64 Programming Basics</h2>
+
+        <p>The simulator executes ARM64 ELF binaries in a bare-metal environment. There is no operating system, no libc, and no system call interface. Your program runs directly on the simulated hardware.</p>
+
+        <h3>Entry Point</h3>
+
+        <p>The entry point must be the <code>_start</code> symbol. The ELF loader begins execution at whatever address this symbol resolves to. If <code>_start</code> is not found, the loader uses the ELF entry point from the file header.</p>
+
+        <pre><code>.global _start
+_start:
+    // Your code begins here
+    MOV X0, #42
+    // ...</code></pre>
+
+        <h3>ELF Sections</h3>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Section</th>
+                    <th>Contents</th>
+                    <th>Description</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><code>.text</code></td>
+                    <td>Executable code</td>
+                    <td>Instructions loaded into simulated memory and executed by the pipeline</td>
+                </tr>
+                <tr>
+                    <td><code>.data</code></td>
+                    <td>Initialized data</td>
+                    <td>Variables with explicit initial values, loaded from the ELF file</td>
+                </tr>
+                <tr>
+                    <td><code>.bss</code></td>
+                    <td>Zero-initialized data</td>
+                    <td>Variables that start at zero, allocated but not stored in the ELF file</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>Register Conventions (AAPCS64)</h3>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Registers</th>
+                    <th>Role</th>
+                    <th>Caller/Callee Saved</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><code>X0</code> &ndash; <code>X7</code></td>
+                    <td>Arguments and return values</td>
+                    <td>Caller-saved</td>
+                </tr>
+                <tr>
+                    <td><code>X8</code></td>
+                    <td>Indirect result location register</td>
+                    <td>Caller-saved</td>
+                </tr>
+                <tr>
+                    <td><code>X9</code> &ndash; <code>X15</code></td>
+                    <td>Temporary / scratch registers</td>
+                    <td>Caller-saved</td>
+                </tr>
+                <tr>
+                    <td><code>X16</code> &ndash; <code>X17</code></td>
+                    <td>Intra-procedure call scratch registers</td>
+                    <td>Caller-saved</td>
+                </tr>
+                <tr>
+                    <td><code>X18</code></td>
+                    <td>Platform register (reserved)</td>
+                    <td>Varies by platform</td>
+                </tr>
+                <tr>
+                    <td><code>X19</code> &ndash; <code>X28</code></td>
+                    <td>Callee-saved registers</td>
+                    <td>Callee-saved</td>
+                </tr>
+                <tr>
+                    <td><code>X29</code></td>
+                    <td>Frame pointer (FP)</td>
+                    <td>Callee-saved</td>
+                </tr>
+                <tr>
+                    <td><code>X30</code></td>
+                    <td>Link register (LR)</td>
+                    <td>Caller-saved</td>
+                </tr>
+                <tr>
+                    <td><code>SP</code></td>
+                    <td>Stack pointer</td>
+                    <td>Special</td>
+                </tr>
+                <tr>
+                    <td><code>XZR</code> (WZR)</td>
+                    <td>Zero register (always reads as 0)</td>
+                    <td>N/A</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <div class="callout callout-warning">
+            <div class="callout-title">Program termination</div>
+            <p>There is no <code>exit()</code> syscall available. The simulator terminates when the max instruction count (<code>-n</code>) or max cycle count (<code>-c</code>) is reached. Design your test programs to run within these limits.</p>
+        </div>
+
+        <h2>Common Instruction Patterns</h2>
+
+        <h3>Arithmetic Instructions</h3>
+
+        <pre><code>ADD X0, X1, X2      // X0 = X1 + X2
+ADD X0, X1, #16     // X0 = X1 + 16 (immediate operand)
+SUB X3, X4, #16     // X3 = X4 - 16 (immediate operand)
+SUB X3, X4, X5      // X3 = X4 - X5
+MUL X5, X6, X7      // X5 = X6 * X7
+AND X8, X9, X10     // X8 = X9 &amp; X10 (bitwise AND)
+ORR X8, X9, X10     // X8 = X9 | X10 (bitwise OR)
+EOR X8, X9, X10     // X8 = X9 ^ X10 (bitwise XOR)
+LSL X8, X9, #3      // X8 = X9 &lt;&lt; 3 (logical shift left)
+LSR X8, X9, #5      // X8 = X9 &gt;&gt; 5 (logical shift right)
+ASR X8, X9, #2      // X8 = X9 &gt;&gt; 2 (arithmetic shift right)
+MOV X0, X1           // X0 = X1 (register move)
+MOV X0, #42          // X0 = 42 (immediate move)
+MVN X0, X1           // X0 = ~X1 (bitwise NOT)</code></pre>
+
+        <h3>Memory Access Instructions</h3>
+
+        <pre><code>// Load instructions
+LDR X0, [X1, #0]    // Load 64-bit value from address X1+0 into X0
+LDR X0, [X1, #8]    // Load 64-bit value from address X1+8 into X0
+LDR W0, [X1, #4]    // Load 32-bit value from address X1+4 into W0
+LDR X0, [X1, X2]    // Load 64-bit value from address X1+X2 (register offset)
+LDUR X0, [X1, #-1]  // Load with unscaled offset (supports negative offsets)
+
+// Store instructions
+STR X2, [X3, #8]    // Store 64-bit X2 to address X3+8
+STR W2, [X3, #4]    // Store 32-bit W2 to address X3+4
+STUR X0, [X1, #-1]  // Store with unscaled offset
+
+// Load/Store pair (two registers in one instruction)
+LDP X0, X1, [X2]    // Load X0 from [X2], X1 from [X2+8]
+LDP X0, X1, [X2, #16] // Load X0 from [X2+16], X1 from [X2+24]
+STP X0, X1, [X2]    // Store X0 to [X2], X1 to [X2+8]
+STP X0, X1, [X2, #16] // Store X0 to [X2+16], X1 to [X2+24]
+
+// Pre-index and post-index
+LDR X0, [X1, #8]!   // Load from X1+8, then X1 = X1+8 (pre-index)
+LDR X0, [X1], #8    // Load from X1, then X1 = X1+8 (post-index)</code></pre>
+
+        <h3>Branch Instructions</h3>
+
+        <pre><code>B label              // Unconditional branch to label
+BL func              // Branch with link (saves return address in X30)
+RET                  // Return to address in X30
+
+// Compare and branch
+CBZ X0, label        // Branch to label if X0 == 0
+CBNZ X0, label       // Branch to label if X0 != 0
+
+// Conditional branches (after CMP or SUBS)
+B.EQ label           // Branch if equal (Z flag set)
+B.NE label           // Branch if not equal (Z flag clear)
+B.LT label           // Branch if less than (signed)
+B.GT label           // Branch if greater than (signed)
+B.LE label           // Branch if less than or equal (signed)
+B.GE label           // Branch if greater than or equal (signed)
+B.HI label           // Branch if unsigned higher
+B.LS label           // Branch if unsigned lower or same
+
+// Compare instruction (sets flags without writing result)
+CMP X0, X1           // Sets flags based on X0 - X1
+CMP X0, #42          // Sets flags based on X0 - 42
+
+// Conditional select
+CSEL X0, X1, X2, EQ  // X0 = (EQ) ? X1 : X2</code></pre>
+
+        <h3>Floating-Point Instructions</h3>
+
+        <pre><code>FADD D0, D1, D2      // Double-precision: D0 = D1 + D2
+FSUB D0, D1, D2      // Double-precision: D0 = D1 - D2
+FMUL D0, D1, D2      // Double-precision: D0 = D1 * D2
+FDIV D0, D1, D2      // Double-precision: D0 = D1 / D2
+FADD S0, S1, S2      // Single-precision: S0 = S1 + S2
+FMUL S0, S1, S2      // Single-precision: S0 = S1 * S2
+FMOV D0, X0          // Move integer to FP register (reinterpret bits)
+FMOV X0, D0          // Move FP register to integer register</code></pre>
+
+        <h3>SIMD Instructions</h3>
+
+        <pre><code>// 128-bit vector operations (NEON)
+ADD V0.4S, V1.4S, V2.4S  // 4 x 32-bit integer addition
+ADD V0.2D, V1.2D, V2.2D  // 2 x 64-bit integer addition
+SUB V0.8B, V1.8B, V2.8B  // 8 x 8-bit integer subtraction
+MUL V0.4S, V1.4S, V2.4S  // 4 x 32-bit integer multiplication
+
+// SIMD load/store
+LDR Q0, [X1]         // Load 128-bit vector from memory
+STR Q0, [X2]         // Store 128-bit vector to memory</code></pre>
+
+        <h3>Memory Barrier Instructions</h3>
+
+        <pre><code>DMB ISH              // Data Memory Barrier (Inner Shareable)
+                       // Ensures memory accesses are observed in order
+                       // by other observers in the Inner Shareable domain
+
+DSB ISH              // Data Synchronization Barrier (Inner Shareable)
+                       // Blocks execution until all memory accesses complete
+
+ISB                  // Instruction Synchronization Barrier
+                       // Flushes the instruction pipeline, ensuring
+                       // subsequent instructions are fetched after the barrier</code></pre>
+
+        <h2>Complete Example Program</h2>
+
+        <p>The following example demonstrates a simple loop that computes a sum in memory:</p>
+
+        <pre><code>.global _start
+
+.section .data
+array:
+    .quad 10, 20, 30, 40, 50    // 5 elements
+size = (. - array) / 8           // Number of elements
+
+.section .bss
+result:
+    .skip 8                      // 64-bit result variable
+
+.section .text
+_start:
+    LDR X0, =array               // X0 = address of array
+    LDR X1, =size                // X1 = number of elements
+    LDR X2, =result              // X2 = address of result
+    MOV X3, #0                   // X3 = sum accumulator = 0
+    MOV X4, #0                   // X4 = loop index = 0
+
+loop:
+    CMP X4, X1                   // Compare index with size
+    B.GE done                    // If index >= size, exit loop
+
+    LDR X5, [X0, X4, LSL #3]    // Load array[index] (X4 * 8 bytes offset)
+    ADD X3, X3, X5               // sum += array[index]
+    ADD X4, X4, #1               // index++
+    B loop                       // Repeat
+
+done:
+    STR X3, [X2]                 // Store result to memory
+    B done                       // Spin forever (simulator terminates via -n or -c)</code></pre>
+
+        <h2>Compilation</h2>
+
+        <h3>Using the Provided Script (Recommended)</h3>
+
+        <p>The project includes a convenience script that auto-detects the cross-compiler and compiles the built-in test source:</p>
+
+        <pre><code>./scripts/compile_test_elf.sh</code></pre>
+
+        <p>This script searches for <code>aarch64-elf-gcc</code>, <code>aarch64-linux-gnu-gcc</code>, or <code>aarch64-none-elf-gcc</code> in your <code>PATH</code> and compiles <code>scripts/test_elf_source.c</code> into <code>tests/data/test_elf_aarch64</code>.</p>
+
+        <h3>Manual Compilation</h3>
+
+        <pre><code># macOS (using Homebrew's aarch64-elf-gcc)
+aarch64-elf-gcc -static -O2 -nostdlib -o program program.s
+
+# Linux (using aarch64-linux-gnu-gcc)
+aarch64-linux-gnu-gcc -static -O2 -nostdlib -o program program.s
+
+# macOS/Linux (using aarch64-none-elf-gcc)
+aarch64-none-elf-gcc -static -O2 -nostdlib -o program program.s
+
+# Compile C source directly (bare-metal)
+aarch64-elf-gcc -static -O2 -nostdlib -o program program.c</code></pre>
+
+        <div class="callout callout-tip">
+            <div class="callout-title">Compiler flags explained</div>
+            <ul style="margin-bottom:0;">
+                <li><code>-static</code> &mdash; Static linking (no dynamic library dependencies)</li>
+                <li><code>-O2</code> &mdash; Optimization level 2 (produces typical real-world instruction patterns)</li>
+                <li><code>-nostdlib</code> &mdash; Do not link standard library (no libc, no startup code)</li>
+            </ul>
+        </div>
+
+        <h3>Optimization Levels for Testing</h3>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Flag</th>
+                    <th>Effect</th>
+                    <th>Use Case</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><code>-O0</code></td>
+                    <td>No optimization, literal instruction mapping</td>
+                    <td>Verify individual instruction behavior</td>
+                </tr>
+                <tr>
+                    <td><code>-O1</code></td>
+                    <td>Basic optimizations</td>
+                    <td>Light testing with some compiler transformations</td>
+                </tr>
+                <tr>
+                    <td><code>-O2</code></td>
+                    <td>Standard optimizations</td>
+                    <td>Recommended for realistic simulation workloads</td>
+                </tr>
+                <tr>
+                    <td><code>-O3</code></td>
+                    <td>Aggressive optimizations including vectorization</td>
+                    <td>Maximum ILP and SIMD usage testing</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>Built-in Test Source</h2>
+
+        <p>The project includes a comprehensive test source file at <code>scripts/test_elf_source.c</code> that covers all major instruction categories:</p>
+
+        <ul>
+            <li><strong>ALU operations</strong> &mdash; ADD, SUB, MUL, AND, ORR, EOR, shifts, moves</li>
+            <li><strong>Load/Store</strong> &mdash; LDR, STR, LDP, STP with various addressing modes</li>
+            <li><strong>Branches</strong> &mdash; conditional branches, compare-and-branch, function calls</li>
+            <li><strong>Floating Point</strong> &mdash; FADD, FSUB, FMUL, FDIV in single and double precision</li>
+            <li><strong>SIMD</strong> &mdash; Vector arithmetic with NEON instructions</li>
+            <li><strong>Barriers</strong> &mdash; DMB, DSB, ISB memory and instruction synchronization barriers</li>
+        </ul>
+
+        <p>This file is compiled by <code>scripts/compile_test_elf.sh</code> and the resulting binary is placed at <code>tests/data/test_elf_aarch64</code>.</p>
+
+        <h2>Important Notes</h2>
+
+        <div class="callout callout-warning">
+            <div class="callout-title">Simulated memory space</div>
+            <p>Programs run in a simulated physical address space. The default size is 256 MB, configurable with <code>-m &lt;MB&gt;</code>. All code, data, and stack must fit within this space. If your program accesses memory beyond the allocated range, the simulator will report a memory error.</p>
+        </div>
+
+        <div class="callout callout-warning">
+            <div class="callout-title">No OS services</div>
+            <p>This is pure bare-metal execution. There are no system calls, no <code>printf</code>, no file I/O, no timers, and no interrupt handling. All data must be initialized statically or computed at runtime within the program.</p>
+        </div>
+
+        <div class="callout callout-info">
+            <div class="callout-title">Stack pointer setup</div>
+            <p>The stack pointer (SP) is initialized to the top of the simulated memory region by the ELF loader. However, if your program uses deeply nested function calls or large stack frames, ensure the stack has sufficient room. You can also manually set SP to a specific address in your <code>_start</code> routine.</p>
+        </div>
+
+        <div class="callout callout-tip">
+            <div class="callout-title">Termination strategy</div>
+            <p>Since there is no exit mechanism, design your test programs with an infinite loop at the end (<code>B .</code>) and use <code>-n &lt;N&gt;</code> or <code>-c &lt;N&gt;</code> to limit simulation length. Alternatively, use a finite loop that naturally exhausts the instruction count.</p>
+        </div>
+
+        <h2>Running Your Program</h2>
+
+        <pre><code># Compile
+aarch64-elf-gcc -static -O2 -nostdlib -o my_program my_program.s
+
+# Simulate (input: my_program, output: output.json)
+./build/arm_cpu_sim -f elf my_program -o output.json
+
+# Simulate with limited instructions and visualization
+./build/arm_cpu_sim -f elf my_program -n 10000 -p 3000 -o output.json</code></pre>
+
+        <div class="page-nav">
+            <a href="03-input-formats.html">
+                <span class="nav-label">Previous</span>
+                <span class="nav-title">&larr; Input Formats</span>
+            </a>
+            <a class="nav-next" href="05-running-simulations.html">
+                <span class="nav-label">Next</span>
+                <span class="nav-title">Running Simulations &rarr;</span>
+            </a>
+        </div>
+
+        <div class="content-footer">
+            ARM CPU Emulator Cookbook &mdash; Built with C++20, CMake, and a passion for computer architecture.
+        </div>
+    </div>
+</main>
+
+<script src="../js/main.js"></script>
+</body>
+</html>
