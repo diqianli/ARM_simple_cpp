@@ -50,6 +50,8 @@ struct CliArgs {
     std::string trace_output_file;
     std::string output_file;                   // Konata JSON output path
     std::string viz_format = "json";            // "json" or "kanata"
+    std::optional<uint64_t> dump_start;        // --dump-range START
+    std::optional<uint64_t> dump_end;          // --dump-range END
     std::string preset;                        // "default", "high_performance", "minimal", "gem5_o3_arm_v7a"
     bool verbose = false;
     bool json_output = false;
@@ -98,6 +100,7 @@ void print_usage(const char* program_name) {
         "Output:\n"
         "  -o, --output <file>      Save Konata visualization JSON to file (default: output/<stem>_YYYYMMDD_HHMM.json)\n"
         "  --viz-format <fmt>       Visualization format: json, kanata (default: json)\n"
+        "  --dump-range <start>-<end>  Export only instructions in [start, end] range (max window: 10000)\n"
         "  --save-trace <file>      Save execution trace to file\n"
         "\n"
         "General:\n"
@@ -204,6 +207,17 @@ bool parse_args(int argc, char* argv[], CliArgs& args) {
         else if (arg == "--viz-format") {
             if (i + 1 >= argc) { std::fprintf(stderr, "Error: missing argument for %s\n", arg.data()); return false; }
             args.viz_format = argv[++i];
+        }
+        else if (arg == "--dump-range") {
+            if (i + 1 >= argc) { std::fprintf(stderr, "Error: missing argument for %s\n", arg.data()); return false; }
+            std::string range_str = argv[++i];
+            auto dash = range_str.find('-');
+            if (dash == std::string::npos) {
+                std::fprintf(stderr, "Error: --dump-range format: START-END (e.g. 100-200)\n");
+                return false;
+            }
+            args.dump_start = std::stoull(range_str.substr(0, dash));
+            args.dump_end = std::stoull(range_str.substr(dash + 1));
         }
         else if (arg == "--preset") {
             if (i + 1 >= argc) { std::fprintf(stderr, "Error: missing argument for %s\n", arg.data()); return false; }
@@ -717,13 +731,20 @@ int run_single(const CliArgs& args, int argc, char* argv[]) {
 
         bool exported;
         if (args.viz_format == "kanata") {
-            exported = cpu->visualization_mut().export_kanata_log_to_file(output_path);
+            exported = cpu->visualization_mut().export_kanata_log_to_file(
+                output_path, args.dump_start, args.dump_end);
         } else {
-            exported = cpu->visualization_mut().export_all_konata_to_file(output_path, true);
+            exported = cpu->visualization_mut().export_all_konata_to_file(
+                output_path, true, args.dump_start, args.dump_end);
         }
 
         std::fprintf(stderr, "\n========================================\n");
         std::fprintf(stderr, "  Input:  %s\n", args.trace_file.c_str());
+        if (args.dump_start && args.dump_end) {
+            std::fprintf(stderr, "  Dump range: instructions %llu - %llu\n",
+                         static_cast<unsigned long long>(*args.dump_start),
+                         static_cast<unsigned long long>(*args.dump_end));
+        }
         if (exported) {
             std::fprintf(stderr, "  Output: %s\n", output_path.c_str());
         } else {
@@ -815,6 +836,21 @@ int main(int argc, char* argv[]) {
     if (!parse_args(argc, argv, args)) {
         print_usage(argv[0]);
         return 1;
+    }
+
+    // Validate --dump-range
+    if (args.dump_start.has_value() != args.dump_end.has_value()) {
+        std::fprintf(stderr, "Error: both --dump-range start and end must be specified (format: START-END)\n");
+        return 1;
+    }
+    if (args.dump_start && args.dump_end) {
+        if (*args.dump_end < *args.dump_start) std::swap(args.dump_start, args.dump_end);
+        uint64_t window = *args.dump_end - *args.dump_start + 1;
+        if (window > 10000) {
+            std::fprintf(stderr, "Error: dump range window too large (%llu instructions). Maximum is 10000. Please narrow the range.\n",
+                         static_cast<unsigned long long>(window));
+            return 1;
+        }
     }
 
     if (args.trace_file.empty() && !args.multi_instance) {

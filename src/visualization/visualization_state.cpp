@@ -103,8 +103,20 @@ bool VisualizationState::export_konata_to_file(const std::string& path, bool pre
     return export_data.write_to_file(path, pretty);
 }
 
-bool VisualizationState::export_all_konata_to_file(const std::string& path, bool pretty) const {
+bool VisualizationState::export_all_konata_to_file(
+    const std::string& path, bool pretty,
+    std::optional<uint64_t> dump_start, std::optional<uint64_t> dump_end) const
+{
     auto ops = pipeline_tracker_.export_all_konata_ops();
+
+    // Filter by instruction range
+    if (dump_start && dump_end) {
+        uint64_t start = *dump_start;
+        uint64_t end = *dump_end;
+        std::erase_if(ops, [start, end](const KonataOp& op) {
+            return op.id < start || op.id > end;
+        });
+    }
 
     KonataExport export_data;
     export_data.total_cycles = current_cycle_;
@@ -114,8 +126,21 @@ bool VisualizationState::export_all_konata_to_file(const std::string& path, bool
     return export_data.write_to_file(path, pretty);
 }
 
-bool VisualizationState::export_kanata_log_to_file(const std::string& path) const {
+bool VisualizationState::export_kanata_log_to_file(
+    const std::string& path,
+    std::optional<uint64_t> dump_start, std::optional<uint64_t> dump_end) const
+{
     auto ops = pipeline_tracker_.export_all_konata_ops();
+
+    // Filter by instruction range
+    if (dump_start && dump_end) {
+        uint64_t start = *dump_start;
+        uint64_t end = *dump_end;
+        std::erase_if(ops, [start, end](const KonataOp& op) {
+            return op.id < start || op.id > end;
+        });
+    }
+
     if (ops.empty()) return false;
     return KanataLogExporter::export_to_file(path, ops, current_cycle_, committed_count_);
 }

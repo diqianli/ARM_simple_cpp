@@ -158,10 +158,16 @@ public:
     bool export_konata_to_file(const std::string& path, bool pretty = false) const;
 
     /// Export all tracked Konata ops to a JSON file.
-    bool export_all_konata_to_file(const std::string& path, bool pretty = false) const;
+    /// If dump_start/dump_end are set, only ops with id in [start, end] are included.
+    bool export_all_konata_to_file(const std::string& path, bool pretty = false,
+                                    std::optional<uint64_t> dump_start = {},
+                                    std::optional<uint64_t> dump_end = {}) const;
 
     /// Export all tracked ops in Kanata log format (.knata).
-    bool export_kanata_log_to_file(const std::string& path) const;
+    /// If dump_start/dump_end are set, only ops with id in [start, end] are included.
+    bool export_kanata_log_to_file(const std::string& path,
+                                    std::optional<uint64_t> dump_start = {},
+                                    std::optional<uint64_t> dump_end = {}) const;
 
     uint64_t current_cycle() const { return current_cycle_; }
     uint64_t committed_count() const { return committed_count_; }
