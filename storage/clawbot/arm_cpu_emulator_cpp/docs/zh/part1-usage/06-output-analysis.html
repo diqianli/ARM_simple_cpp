@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>输出与结果分析 - ARM CPU 仿真器手册</title>
+    <link rel="stylesheet" href="../../css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>body { font-family: 'Inter', var(--font-sans); }</style>
+</head>
+<body>
+
+<header class="site-header">
+    <a class="header-logo" href="../index.html">
+        <span class="logo-icon">&#x1F9E0;</span>
+        ARM CPU 仿真器手册
+    </a>
+    <div class="header-search">
+        <span class="search-icon">&#x1F50D;</span>
+        <input type="text" placeholder="搜索文档... (Ctrl+K)" autocomplete="off">
+        <div class="search-results"></div>
+    </div>
+    <a class="lang-switch" href="../../part1-usage/06-output-analysis.html" style="color:var(--text-secondary);font-size:0.85rem;text-decoration:none;margin-right:8px;">English</a>
+    <button class="menu-toggle" aria-label="Toggle menu">&#9776;</button>
+</header>
+
+<nav class="sidebar" id="sidebar">
+    <div class="nav-section">
+        <div class="nav-section-title">第一部分 &mdash; 使用指南</div>
+        <a class="nav-item" href="01-quick-start.html">1. 快速开始</a>
+        <a class="nav-item" href="02-cli-reference.html">2. CLI 参数参考</a>
+        <a class="nav-item" href="03-input-formats.html">3. 输入格式</a>
+        <a class="nav-item" href="04-writing-test-programs.html">4. 编写测试程序</a>
+        <a class="nav-item" href="05-running-simulations.html">5. 运行仿真</a>
+        <a class="nav-item active" href="06-output-analysis.html">6. 输出与结果分析</a>
+        <a class="nav-item" href="07-visualization.html">7. 可视化工具</a>
+        <a class="nav-item" href="08-configuration-presets.html">8. 配置预设</a>
+        <a class="nav-item" href="09-benchmarks.html">9. 基准测试</a>
+        <a class="nav-item" href="10-automation-scripts.html">10. 自动化脚本</a>
+        <a class="nav-item" href="11-faq.html">11. 常见问题与排错</a>
+    </div>
+    <div class="nav-section">
+        <div class="nav-section-title">第二部分 &mdash; 架构文档</div>
+        <a class="nav-item" href="../part2-architecture/01-system-overview.html">1. 系统概览</a>
+        <a class="nav-item" href="../part2-architecture/02-cpu-pipeline.html">2. CPU 流水线</a>
+        <a class="nav-item" href="../part2-architecture/03-ooo-engine.html">3. 乱序执行引擎</a>
+        <a class="nav-item" href="../part2-architecture/04-instruction-decoder.html">4. 指令解码器</a>
+        <a class="nav-item" href="../part2-architecture/05-memory-hierarchy.html">5. 内存层次结构</a>
+        <a class="nav-item" href="../part2-architecture/06-elf-loader.html">6. ELF 加载器</a>
+        <a class="nav-item" href="../part2-architecture/07-statistics.html">7. 统计收集系统</a>
+        <a class="nav-item" href="../part2-architecture/08-visualization-system.html">8. 可视化系统</a>
+        <a class="nav-item" href="../part2-architecture/09-chi-coherence.html">9. CHI 一致性协议</a>
+        <a class="nav-item" href="../part2-architecture/10-type-system.html">10. 类型系统</a>
+        <a class="nav-item" href="../part2-architecture/11-input-sources.html">11. 输入源接口</a>
+        <a class="nav-item" href="../part2-architecture/12-gem5-comparison.html">12. 与 GEM5 对比</a>
+    </div>
+</nav>
+
+<main class="main-content">
+    <div class="content-wrapper">
+
+        <div class="breadcrumb">
+            <a href="../index.html">首页</a>
+            <span class="sep">&rsaquo;</span>
+            <a href="../index.html">使用指南</a>
+            <span class="sep">&rsaquo;</span>
+            输出与结果分析
+        </div>
+
+        <div class="page-header">
+            <h1>输出与结果分析</h1>
+            <p class="page-desc">了解 JSON 输出格式、性能指标以及如何解读仿真结果。</p>
+        </div>
+
+        <h2>JSON 输出文件</h2>
+
+        <p>仿真器将结果写入 JSON 文件（默认为 <code>output.json</code>，可通过 <code>-o</code> 配置）。输出包含三个主要部分：</p>
+
+        <h3>1. 元数据 (Metadata)</h3>
+        <p>仿真所使用的 CPU 配置快照，包括：</p>
+        <ul>
+            <li><code>window_size</code>（ROB 大小）</li>
+            <li><code>fetch_width</code>、<code>issue_width</code>、<code>commit_width</code></li>
+            <li>Cache 大小和关联度（L1、L2、L3）</li>
+            <li>Cache 延迟</li>
+            <li>CPU 频率</li>
+            <li>Load/Store 队列大小和流水线数量</li>
+        </ul>
+
+        <h3>2. 操作记录 (Operations)</h3>
+        <p>每条指令的流水线时序数据。每条记录了指令经过各个 Pipeline 阶段的周期：</p>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>字段</th>
+                    <th>描述</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr><td><code>fetch_cycle</code></td><td>指令被 Fetch 的周期</td></tr>
+                <tr><td><code>decode_cycle</code></td><td>指令被 Decode 的周期</td></tr>
+                <tr><td><code>rename_cycle</code></td><td>寄存器重命名完成的周期</td></tr>
+                <tr><td><code>dispatch_cycle</code></td><td>指令被 Dispatch 到 Issue 队列的周期</td></tr>
+                <tr><td><code>issue_cycle</code></td><td>指令被 Issue 到功能单元的周期</td></tr>
+                <tr><td><code>execute_cycle</code></td><td>开始 Execute 的周期</td></tr>
+                <tr><td><code>memory_cycle</code></td><td>Memory 访问完成的周期（仅 Load/Store 指令）</td></tr>
+                <tr><td><code>writeback_cycle</code></td><td>结果 Writeback 的周期</td></tr>
+                <tr><td><code>commit_cycle</code></td><td>指令 Retire（Commit）的周期</td></tr>
+            </tbody>
+        </table>
+
+        <h3>3. 通道数据 (Lanes)</h3>
+        <p>每个周期的 Pipeline 阶段详细信息，供 Konata 可视化渲染时间线图表使用。</p>
+
+        <h2>性能指标</h2>
+
+        <p>使用 <code>-j</code> 标志可将性能指标输出到 stdout，或包含在输出 JSON 中。关键指标包括：</p>
+
+        <h3>IPC（每周期指令数，Instructions Per Cycle）</h3>
+        <p><code>total_instructions / total_cycles</code>。值越高越好。对于非内存受限的工作负载，优化良好的乱序核心通常能达到 IPC &gt; 1.0。</p>
+
+        <h3>CPI（每指令周期数，Cycles Per Instruction）</h3>
+        <p>IPC 的倒数。值越低越好。适用于与顺序处理器进行对比。</p>
+
+        <h3>Cache 命中率</h3>
+        <p>每个 Cache 层级（L1、L2、L3）的 <code>hits / (hits + misses)</code>。高 L1 命中率（&gt; 90%）对性能至关重要。</p>
+
+        <h3>MPKI（每千条指令缺失数，Misses Per Kilo Instructions）</h3>
+        <p><code>cache_misses * 1000 / total_instructions</code>。用于在不同仿真长度之间比较 Cache 性能的归一化指标。</p>
+
+        <h3>分支预测准确率</h3>
+        <p><code>correct_predictions / total_branches</code>。现代分支预测器在典型工作负载上能达到 &gt; 95% 的准确率。</p>
+
+        <h3>功能单元利用率</h3>
+        <p>仿真期间各功能单元类型的繁忙程度分布：</p>
+        <ul>
+            <li><strong>IntAlu</strong> &mdash; 整数算术和逻辑</li>
+            <li><strong>IntMul</strong> &mdash; 整数乘法和除法</li>
+            <li><strong>Load</strong> &mdash; Load 单元</li>
+            <li><strong>Store</strong> &mdash; Store 单元</li>
+            <li><strong>Branch</strong> &mdash; 分支解析</li>
+            <li><strong>FpSimd</strong> &mdash; 浮点和 SIMD</li>
+            <li><strong>System</strong> &mdash; 系统指令（屏障等）</li>
+            <li><strong>Crypto</strong> &mdash; 加密指令</li>
+        </ul>
+
+        <h3>Pipeline 停顿分布</h3>
+        <p>按类型分类的 Pipeline 停顿分布：</p>
+        <ul>
+            <li><strong>数据冒险 (Data hazard)</strong> &mdash; 等待寄存器依赖</li>
+            <li><strong>控制冒险 (Control hazard)</strong> &mdash; 等待分支解析</li>
+            <li><strong>结构冒险 (Structural hazard)</strong> &mdash; 无可用功能单元</li>
+            <li><strong>内存 (Memory)</strong> &mdash; 等待 Cache 或内存访问</li>
+        </ul>
+
+        <h3>时间序列</h3>
+        <p>每 1000 个周期采样一次 IPC 等指标，用于识别仿真过程中的性能阶段变化。</p>
+
+        <h2>JSON 指标输出示例</h2>
+
+        <pre><code>{
+  "total_instructions": 1000,
+  "total_cycles": 2500,
+  "ipc": 0.40,
+  "cache": {
+    "l1": { "hits": 800, "misses": 200, "hit_rate": 0.80 },
+    "l2": { "hits": 150, "misses": 50, "hit_rate": 0.75 },
+    "l3": { "hits": 40, "misses": 10, "hit_rate": 0.80 }
+  },
+  "branch_prediction": { "correct": 180, "total": 200, "accuracy": 0.90 },
+  "fu_utilization": {
+    "int_alu": 0.45,
+    "load": 0.25,
+    "store": 0.15,
+    "branch": 0.10,
+    "fp_simd": 0.05
+  }
+}</code></pre>
+
+        <h2>详细 Trace 选项</h2>
+
+        <h3>保存执行 Trace</h3>
+        <p>使用 <code>--save-trace</code> 保存详细的执行 Trace，包括每个周期所有 Pipeline 阶段的状态：</p>
+        <pre><code>./build/arm_cpu_sim -f elf program.elf --save-trace</code></pre>
+
+        <h3>Dump 特定指令范围</h3>
+        <p>使用 <code>--dump-range</code> Dump 特定指令范围的 Pipeline Trace：</p>
+        <pre><code># Dump 指令 100 到 200 的 Pipeline Trace
+./build/arm_cpu_sim -f elf program.elf --dump-range 100:200</code></pre>
+
+        <h2>结果分析技巧</h2>
+
+        <div class="callout callout-tip">
+            <div class="callout-title">低 IPC + 高 L1 缺失率</div>
+            <p>工作负载受内存限制。考虑增大 L1 Cache 大小、改善预取，或优化测试程序中的数据访问模式。</p>
+        </div>
+
+        <div class="callout callout-tip">
+            <div class="callout-title">低 IPC + 低分支准确率</div>
+            <p>工作负载分支密集且难以预测。考虑改进分支预测器或减少测试程序中的分支密度。</p>
+        </div>
+
+        <div class="callout callout-tip">
+            <div class="callout-title">功能单元利用率严重失衡</div>
+            <p>工作负载存在特定资源瓶颈。例如，如果 Load 单元已饱和而 IntAlu 空闲，则程序受限于内存带宽而非计算吞吐量。</p>
+        </div>
+
+        <div class="page-nav">
+            <a class="nav-prev" href="05-running-simulations.html">
+                <span class="nav-label">上一页</span>
+                <span class="nav-title">&larr; 运行仿真</span>
+            </a>
+            <a class="nav-next" href="07-visualization.html">
+                <span class="nav-label">下一页</span>
+                <span class="nav-title">可视化工具 &rarr;</span>
+            </a>
+        </div>
+
+        <div class="content-footer">
+            ARM CPU 仿真器手册 &mdash; 基于 C++20、CMake 构建，致力于计算机架构研究。
+        </div>
+    </div>
+</main>
+
+<script src="../../js/main.js"></script>
+</body>
+</html>

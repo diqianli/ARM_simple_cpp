@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>类型系统与数据结构 - ARM CPU 仿真器手册</title>
+    <link rel="stylesheet" href="../../css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>body { font-family: 'Inter', var(--font-sans); }</style>
+</head>
+<body>
+
+<header class="site-header">
+    <a class="header-logo" href="../index.html">
+        <span class="logo-icon">&#x1F9E0;</span>
+        ARM CPU 仿真器手册
+    </a>
+    <div class="header-search">
+        <span class="search-icon">&#x1F50D;</span>
+        <input type="text" placeholder="搜索文档... (Ctrl+K)" autocomplete="off">
+        <div class="search-results"></div>
+    </div>
+    <a class="lang-switch" href="../../part2-architecture/10-type-system.html" style="color:var(--text-secondary);font-size:0.85rem;text-decoration:none;margin-right:8px;">English</a>
+    <button class="menu-toggle" aria-label="Toggle menu">&#9776;</button>
+</header>
+
+<nav class="sidebar" id="sidebar">
+    <div class="nav-section">
+        <div class="nav-section-title">第一部分 &mdash; 使用指南</div>
+        <a class="nav-item" href="../part1-usage/01-quick-start.html">1. 快速开始</a>
+        <a class="nav-item" href="../part1-usage/02-cli-reference.html">2. CLI 参数参考</a>
+        <a class="nav-item" href="../part1-usage/03-input-formats.html">3. 输入格式</a>
+        <a class="nav-item" href="../part1-usage/04-writing-test-programs.html">4. 编写测试程序</a>
+        <a class="nav-item" href="../part1-usage/05-running-simulations.html">5. 运行仿真</a>
+        <a class="nav-item" href="../part1-usage/06-output-analysis.html">6. 输出与结果分析</a>
+        <a class="nav-item" href="../part1-usage/07-visualization.html">7. 可视化工具</a>
+        <a class="nav-item" href="../part1-usage/08-configuration-presets.html">8. 配置预设</a>
+        <a class="nav-item" href="../part1-usage/09-benchmarks.html">9. 基准测试</a>
+        <a class="nav-item" href="../part1-usage/10-automation-scripts.html">10. 自动化脚本</a>
+        <a class="nav-item" href="../part1-usage/11-faq.html">11. 常见问题与排错</a>
+    </div>
+    <div class="nav-section">
+        <div class="nav-section-title">第二部分 &mdash; 架构文档</div>
+        <a class="nav-item" href="01-system-overview.html">1. 系统概览</a>
+        <a class="nav-item" href="02-cpu-pipeline.html">2. CPU 流水线</a>
+        <a class="nav-item" href="03-ooo-engine.html">3. 乱序执行引擎</a>
+        <a class="nav-item" href="04-instruction-decoder.html">4. 指令解码器</a>
+        <a class="nav-item" href="05-memory-hierarchy.html">5. 内存层次结构</a>
+        <a class="nav-item" href="06-elf-loader.html">6. ELF 加载器</a>
+        <a class="nav-item" href="07-statistics.html">7. 统计收集系统</a>
+        <a class="nav-item" href="08-visualization-system.html">8. 可视化系统</a>
+        <a class="nav-item" href="09-chi-coherence.html">9. CHI 一致性协议</a>
+        <a class="nav-item active" href="10-type-system.html">10. 类型系统</a>
+        <a class="nav-item" href="11-input-sources.html">11. 输入源接口</a>
+        <a class="nav-item" href="12-gem5-comparison.html">12. 与 GEM5 对比</a>
+    </div>
+</nav>
+
+<main class="main-content">
+    <div class="content-wrapper">
+
+        <div class="breadcrumb">
+            <a href="../index.html">首页</a>
+            <span class="sep">&rsaquo;</span>
+            <a href="../index.html">架构文档</a>
+            <span class="sep">&rsaquo;</span>
+            类型系统
+        </div>
+
+        <div class="page-header">
+            <h1>类型系统与数据结构</h1>
+            <p class="page-desc">ARM CPU 仿真器中使用的核心类型、枚举和数据结构，包括寄存器定义、指令表示和错误处理。</p>
+        </div>
+
+        <p>所有核心类型定义在 <code>include/arm_cpu/types.hpp</code>（732 行）。该文件使用现代 C++20 特性，包括作用域枚举、结构体、<code>constexpr</code> 和 concept。</p>
+
+        <h2>寄存器类型</h2>
+
+        <p>仿真器使用强类型枚举建模 ARM64 寄存器文件：</p>
+
+        <pre><code class="language-cpp">// 通用寄存器
+enum class Reg : uint8_t { X0, X1, ..., X28, X29, FP, LR, SP, XZR };
+
+// 向量/SIMD 寄存器
+enum class VReg : uint8_t { V0, V1, ..., V31 };
+
+// 谓词寄存器 (SVE)
+enum class PReg : uint8_t { P0, P1, ..., P15 };</code></pre>
+
+        <ul>
+            <li><strong>Reg：</strong>31 个通用寄存器（X0&ndash;X30）加上帧指针（FP/X29）、链接寄存器（LR/X30）、栈指针（SP）和零寄存器（XZR）。</li>
+            <li><strong>VReg：</strong>32 个 128 位 SIMD/NEON 寄存器（V0&ndash;V31）。</li>
+            <li><strong>PReg：</strong>16 个用于 SVE 的谓词寄存器（P0&ndash;P15）。</li>
+        </ul>
+
+        <h2>OpcodeType 枚举（约 80 个条目）</h2>
+
+        <p>对仿真器识别的每条指令进行分类的核心枚举。按功能类别分组：</p>
+
+        <pre><code class="language-cpp">enum class OpcodeType : uint8_t {
+    // 整数 ALU
+    Add, Sub, And, Or, Xor, Shift, Rotate, Neg, Not,
+    Mul, Mneg, Div, Udiv, Rem, Urem,
+    // 比较
+    Cmp, Cmn, Tst,
+    // 数据移动
+    Mov, Mvn, Movz, Movk,
+    // Load/Store
+    Load, Store, LoadPair, StorePair, LoadByte, StoreByte,
+    LoadHalf, StoreHalf, LoadSigned, Prefetch,
+    // 分支
+    Branch, BranchLink, BranchReg, CondBranch,
+    CompareBranch, TestBranch, Return, ExceptionReturn,
+    // 浮点
+    FpAdd, FpSub, FpMul, FpDiv, FpSqrt,
+    FpCmp, FpConvert, FpRound,
+    // SIMD/NEON
+    SimdAdd, SimdSub, SimdMul, SimdShift, SimdCompare,
+    SimdLoad, SimdStore, SimdMove,
+    // SVE
+    SveAdd, SveSub, SveMul, SveLoad, SveStore,
+    // SME
+    SmeAdd, SmeMul, SmeLoad, SmeStore, SmeOuterProduct,
+    // 加密
+    AesEncode, AesDecode, AesMix, AesMc,
+    Sha1Hash, Sha256Hash, Sha512Hash,
+    // 系统
+    Barrier, Nop, Sys, Msr, Mrs,
+    // 其他
+    Unknown, Count
+};</code></pre>
+
+        <h2>分类函数</h2>
+
+        <p>工具函数将操作码分为不同类别，供 Pipeline 调度器和统计收集器使用：</p>
+
+        <pre><code class="language-cpp">bool is_memory_op(OpcodeType);   // Load, Store, LoadPair, StorePair 等
+bool is_branch(OpcodeType);      // Branch, BranchLink, CondBranch 等
+bool is_compute(OpcodeType);     // Add, Sub, Mul 等
+bool is_simd(OpcodeType);        // SimdAdd, SimdSub 等
+bool is_sve(OpcodeType);         // SveAdd, SveSub 等
+bool is_sme(OpcodeType);         // SmeAdd, SmeMul 等
+bool is_crypto(OpcodeType);      // AesEncode, Sha1Hash 等
+bool is_barrier(OpcodeType);     // Barrier</code></pre>
+
+        <h2>Instruction 结构体（Builder 模式）</h2>
+
+        <p>表示仿真 Pipeline 中单条指令的核心数据结构。使用 Builder 模式方便构造：</p>
+
+        <pre><code class="language-cpp">struct Instruction {
+    uint64_t pc = 0;
+    OpcodeType opcode = OpcodeType::Unknown;
+    std::string mnemonic;
+
+    // 寄存器
+    StaticVector&lt;Reg, 4&gt; src_regs;
+    StaticVector&lt;Reg, 4&gt; dst_regs;
+    StaticVector&lt;VReg, 4&gt; src_vregs;
+    StaticVector&lt;VReg, 4&gt; dst_vregs;
+
+    // 内存
+    uint64_t mem_addr = 0;
+    std::size_t mem_size = 0;
+    bool is_load = false;
+    bool is_store = false;
+
+    // 分支
+    uint64_t branch_target = 0;
+    bool branch_taken = false;
+
+    // Builder 方法
+    Instruction&amp; with_pc(uint64_t pc);
+    Instruction&amp; with_opcode(OpcodeType op);
+    Instruction&amp; with_src_reg(Reg r);
+    Instruction&amp; with_dst_reg(Reg r);
+    Instruction&amp; with_mem_access(uint64_t addr, std::size_t size, bool is_load);
+    Instruction&amp; with_branch(uint64_t target, bool taken);
+};</code></pre>
+
+        <h2>InstrStatus 枚举</h2>
+
+        <p>跟踪指令在乱序 Pipeline 中的生命周期：</p>
+
+        <pre><code class="language-cpp">enum class InstrStatus : uint8_t {
+    Waiting,     // 在窗口中，等待依赖
+    Ready,       // 依赖已解决，准备发射
+    Executing,   // 正在功能单元上执行
+    Completed,   // 执行完成，结果可用
+    Committed    // 已从 Pipeline 退休
+};</code></pre>
+
+        <h2>StaticVector&lt;T, N&gt;</h2>
+
+        <p>一种栈分配的小型向量，避免堆分配。在寄存器列表和依赖集等场景中广泛使用：</p>
+        <ul>
+            <li><strong>固定容量 N：</strong>最大元素数量（编译时常量）</li>
+            <li><strong>动态大小可达 N：</strong>可以容纳 0 到 N 个元素</li>
+            <li><strong>无堆分配：</strong>所有存储在栈上，适合热路径数据结构</li>
+            <li><strong>典型用法：</strong><code>StaticVector&lt;Reg, 4&gt;</code> 用于寄存器操作数列表</li>
+        </ul>
+
+        <h2>错误处理：Result&lt;T&gt;</h2>
+
+        <p>仿真器使用基于 <code>std::variant</code> 的 Rust 风格错误处理模式：</p>
+
+        <pre><code class="language-cpp">// Rust 风格错误处理
+template&lt;typename T&gt;
+using Result = std::variant&lt;T, EmulatorError&gt;;
+
+// 成功辅助函数
+template&lt;typename T&gt;
+Result&lt;T&gt; Ok(T value);
+
+// 错误辅助函数
+template&lt;typename T&gt;
+Result&lt;T&gt; Err(EmulatorError error);
+
+// TRY 宏：遇到错误时提前返回
+#define TRY(expr) \
+    ({ auto _result = (expr); \
+       if (std::holds_alternative&lt;EmulatorError&gt;(_result)) \
+           return std::get&lt;EmulatorError&gt;(_result); \
+       std::get&lt;T&gt;(std::move(_result)); })</code></pre>
+
+        <p>此模式在不使用异常的情况下沿调用栈传播错误，遵循原始 Rust 实现中使用的相同约定。<code>TRY</code> 宏解包成功值或在遇到错误时立即返回，类似于 Rust 的 <code>?</code> 操作符。</p>
+
+        <div class="page-nav">
+            <a class="nav-prev" href="09-chi-coherence.html">
+                <span class="nav-label">上一页</span>
+                <span class="nav-title">&larr; CHI 一致性协议</span>
+            </a>
+            <a class="nav-next" href="11-input-sources.html">
+                <span class="nav-label">下一页</span>
+                <span class="nav-title">输入源接口 &rarr;</span>
+            </a>
+        </div>
+
+        <div class="content-footer">
+            ARM CPU 仿真器手册 &mdash; 基于 C++20、CMake 构建，致力于计算机架构研究。
+        </div>
+    </div>
+</main>
+
+<script src="../../js/main.js"></script>
+</body>
+</html>

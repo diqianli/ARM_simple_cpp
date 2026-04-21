@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>可视化系统 - ARM CPU 仿真器手册</title>
+    <link rel="stylesheet" href="../../css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>body { font-family: 'Inter', var(--font-sans); }</style>
+</head>
+<body>
+
+<header class="site-header">
+    <a class="header-logo" href="../index.html">
+        <span class="logo-icon">&#x1F9E0;</span>
+        ARM CPU 仿真器手册
+    </a>
+    <div class="header-search">
+        <span class="search-icon">&#x1F50D;</span>
+        <input type="text" placeholder="搜索文档... (Ctrl+K)" autocomplete="off">
+        <div class="search-results"></div>
+    </div>
+    <a class="lang-switch" href="../../part2-architecture/08-visualization-system.html" style="color:var(--text-secondary);font-size:0.85rem;text-decoration:none;margin-right:8px;">English</a>
+    <button class="menu-toggle" aria-label="Toggle menu">&#9776;</button>
+</header>
+
+<nav class="sidebar" id="sidebar">
+    <div class="nav-section">
+        <div class="nav-section-title">第一部分 &mdash; 使用指南</div>
+        <a class="nav-item" href="../part1-usage/01-quick-start.html">1. 快速开始</a>
+        <a class="nav-item" href="../part1-usage/02-cli-reference.html">2. CLI 参数参考</a>
+        <a class="nav-item" href="../part1-usage/03-input-formats.html">3. 输入格式</a>
+        <a class="nav-item" href="../part1-usage/04-writing-test-programs.html">4. 编写测试程序</a>
+        <a class="nav-item" href="../part1-usage/05-running-simulations.html">5. 运行仿真</a>
+        <a class="nav-item" href="../part1-usage/06-output-analysis.html">6. 输出与结果分析</a>
+        <a class="nav-item" href="../part1-usage/07-visualization.html">7. 可视化工具</a>
+        <a class="nav-item" href="../part1-usage/08-configuration-presets.html">8. 配置预设</a>
+        <a class="nav-item" href="../part1-usage/09-benchmarks.html">9. 基准测试</a>
+        <a class="nav-item" href="../part1-usage/10-automation-scripts.html">10. 自动化脚本</a>
+        <a class="nav-item" href="../part1-usage/11-faq.html">11. 常见问题与排错</a>
+    </div>
+    <div class="nav-section">
+        <div class="nav-section-title">第二部分 &mdash; 架构文档</div>
+        <a class="nav-item" href="01-system-overview.html">1. 系统概览</a>
+        <a class="nav-item" href="02-cpu-pipeline.html">2. CPU 流水线</a>
+        <a class="nav-item" href="03-ooo-engine.html">3. 乱序执行引擎</a>
+        <a class="nav-item" href="04-instruction-decoder.html">4. 指令解码器</a>
+        <a class="nav-item" href="05-memory-hierarchy.html">5. 内存层次结构</a>
+        <a class="nav-item" href="06-elf-loader.html">6. ELF 加载器</a>
+        <a class="nav-item" href="07-statistics.html">7. 统计收集系统</a>
+        <a class="nav-item active" href="08-visualization-system.html">8. 可视化系统</a>
+        <a class="nav-item" href="09-chi-coherence.html">9. CHI 一致性协议</a>
+        <a class="nav-item" href="10-type-system.html">10. 类型系统</a>
+        <a class="nav-item" href="11-input-sources.html">11. 输入源接口</a>
+        <a class="nav-item" href="12-gem5-comparison.html">12. 与 GEM5 对比</a>
+    </div>
+</nav>
+
+<main class="main-content">
+    <div class="content-wrapper">
+
+        <div class="breadcrumb">
+            <a href="../index.html">首页</a>
+            <span class="sep">&rsaquo;</span>
+            <a href="../index.html">架构文档</a>
+            <span class="sep">&rsaquo;</span>
+            可视化系统
+        </div>
+
+        <div class="page-header">
+            <h1>可视化系统</h1>
+            <p class="page-desc">生成兼容 Konata 的 JSON 格式 Pipeline 时间线可视化数据，并提供基于 Web 的交互式渲染界面。</p>
+        </div>
+
+        <h2>VisualizationState</h2>
+
+        <p>源文件：<code>visualization/visualization_state.hpp</code></p>
+
+        <p><code>VisualizationState</code> 类是所有可视化数据的中央状态管理器。它维护一个 <code>VisualInstruction</code> 条目列表，每个条目包含：</p>
+
+        <ul>
+            <li><strong>指令元数据</strong> &mdash; PC、操作码、助记符和操作数字符串</li>
+            <li><strong>Pipeline 阶段时间戳</strong> &mdash; 指令进入每个阶段的周期号（fetch、decode、rename、dispatch、issue、execute、memory、writeback、commit）</li>
+            <li><strong>颜色编码</strong> &mdash; 基于指令类型，用于时间线中的视觉区分</li>
+        </ul>
+
+        <p>状态管理器还提供：</p>
+
+        <ul>
+            <li><strong>快照管理</strong>，用于大型 Trace 的增量渲染</li>
+            <li><strong>历史记录</strong>，用于可视化界面中的撤销/重做导航</li>
+        </ul>
+
+        <h2>PipelineTracker</h2>
+
+        <p>源文件：<code>simulation/pipeline_tracker.hpp</code></p>
+
+        <p><code>PipelineTracker</code> 在仿真过程中记录阶段转换。它使用 <code>StageTiming</code> 结构体存储指令进入每个 Pipeline 阶段的周期号。Tracker 在每个阶段转换时由 CPU 流水线调用：</p>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>方法</th>
+                    <th>Pipeline 阶段</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr><td><code>record_fetch()</code></td><td>取指</td></tr>
+                <tr><td><code>record_decode()</code></td><td>译码</td></tr>
+                <tr><td><code>record_rename()</code></td><td>寄存器重命名</td></tr>
+                <tr><td><code>record_dispatch()</code></td><td>分派 / 分配</td></tr>
+                <tr><td><code>record_issue()</code></td><td>发射 / 调度</td></tr>
+                <tr><td><code>record_execute()</code></td><td>执行</td></tr>
+                <tr><td><code>record_memory()</code></td><td>内存访问</td></tr>
+                <tr><td><code>record_writeback()</code></td><td>写回</td></tr>
+                <tr><td><code>record_commit()</code></td><td>提交 / 退休</td></tr>
+            </tbody>
+        </table>
+
+        <h2>PipelineTrackerViz</h2>
+
+        <p>源文件：<code>visualization/pipeline_tracker_viz.hpp</code></p>
+
+        <p><code>PipelineTrackerViz</code> 组件将 Pipeline 时间线渲染为交互式 HTML/Canvas 可视化。指令按类型进行颜色编码：</p>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>指令类型</th>
+                    <th>颜色</th>
+                    <th>十六进制代码</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr><td>ALU</td><td><span style="color:#3b82f6;font-weight:bold;">蓝色</span></td><td><code>#3b82f6</code></td></tr>
+                <tr><td>Load</td><td><span style="color:#22c55e;font-weight:bold;">绿色</span></td><td><code>#22c55e</code></td></tr>
+                <tr><td>Store</td><td><span style="color:#f97316;font-weight:bold;">橙色</span></td><td><code>#f97316</code></td></tr>
+                <tr><td>Branch</td><td><span style="color:#ef4444;font-weight:bold;">红色</span></td><td><code>#ef4444</code></td></tr>
+                <tr><td>FP / SIMD</td><td><span style="color:#a855f7;font-weight:bold;">紫色</span></td><td><code>#a855f7</code></td></tr>
+                <tr><td>System</td><td><span style="color:#6b7280;font-weight:bold;">灰色</span></td><td><code>#6b7280</code></td></tr>
+                <tr><td>Crypto</td><td><span style="color:#eab308;font-weight:bold;">黄色</span></td><td><code>#eab308</code></td></tr>
+            </tbody>
+        </table>
+
+        <h2>Konata JSON 导出</h2>
+
+        <p>可视化系统生成的 JSON 输出格式兼容 Konata Pipeline 查看器。数据结构按周期组织，每个周期包含各个 Pipeline 阶段中存在的指令：</p>
+
+        <pre><code>{
+  "core": [
+    {
+      "cycle": 0,
+      "fetch": [{"pc": 0x1000, "instr": "ADD X0, X1, X2"}],
+      "decode": [...],
+      "rename": [...],
+      "dispatch": [...],
+      "issue": [...],
+      "execute": [...],
+      "memory": [...],
+      "writeback": [...],
+      "commit": [...]
+    }
+  ]
+}</code></pre>
+
+        <p>每个指令条目包含程序计数器（PC）和反汇编指令字符串，使查看器能够为每个 Pipeline 槽位同时显示地址和助记符信息。</p>
+
+        <h2>Web 服务器</h2>
+
+        <p>可视化 Web 界面位于 <code>tools/viz_server/</code>：</p>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>文件</th>
+                    <th>用途</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><code>index.html</code></td>
+                    <td>主可视化页面，包含文件选择器和多标签视图</td>
+                </tr>
+                <tr>
+                    <td><code>app_static.js</code></td>
+                    <td>JavaScript 应用逻辑，用于数据加载和视图管理</td>
+                </tr>
+                <tr>
+                    <td><code>style.css</code></td>
+                    <td>可视化专用样式（时间线、指标面板、控件）</td>
+                </tr>
+                <tr>
+                    <td><code>konata/konata_renderer.js</code></td>
+                    <td>Konata Pipeline 时间线渲染器，支持缩放和平移</td>
+                </tr>
+                <tr>
+                    <td><code>perf_stats_view.js</code></td>
+                    <td>表格化性能指标视图（IPC、Cache 统计、指令混合）</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <p>可视化可以通过两种方式访问：</p>
+
+        <ul>
+            <li><strong>内置 Web 服务器</strong>：使用 <code>-p &lt;port&gt;</code> 启动 HTTP 服务器，自动在 <code>http://localhost:&lt;port&gt;</code> 提供可视化页面</li>
+            <li><strong>静态文件</strong>：直接在浏览器中打开 <code>tools/viz_server/index.html</code>，通过文件选择器加载输出 JSON 文件</li>
+        </ul>
+
+        <div class="callout callout-tip">
+            <div class="callout-title">推荐访问方式</div>
+            <p>为获得最佳体验，建议直接以文件方式打开可视化页面：<code>file:///Users/mac/storage/clawbot/arm_cpu_emulator_cpp/tools/viz_server/index.html</code></p>
+        </div>
+
+        <h2>Kanata 日志导出</h2>
+
+        <p>源文件：<code>visualization/kanata_log_exporter.hpp</code></p>
+
+        <p><code>KanataLogExporter</code> 提供执行 Trace 的替代导出格式：</p>
+
+        <ul>
+            <li>以 Kanata 日志格式导出执行 Trace</li>
+            <li>兼容外部 Kanata 可视化工具</li>
+            <li>包含每条指令的阶段时序和依赖信息</li>
+            <li>适用于跨工具分析和与其他仿真器输出的比较</li>
+        </ul>
+
+        <div class="page-nav">
+            <a href="07-statistics.html">
+                <span class="nav-label">上一页</span>
+                <span class="nav-title">&larr; 统计收集系统</span>
+            </a>
+            <a class="nav-next" href="09-chi-coherence.html">
+                <span class="nav-label">下一页</span>
+                <span class="nav-title">CHI 一致性协议 &rarr;</span>
+            </a>
+        </div>
+
+        <div class="content-footer">
+            ARM CPU 仿真器手册 &mdash; 基于 C++20、CMake 构建，致力于计算机架构研究。
+        </div>
+    </div>
+</main>
+
+<script src="../../js/main.js"></script>
+</body>
+</html>

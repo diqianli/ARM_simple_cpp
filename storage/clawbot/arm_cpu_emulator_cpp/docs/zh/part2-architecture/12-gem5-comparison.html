@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>与 GEM5 对比 - ARM CPU 仿真器手册</title>
+    <link rel="stylesheet" href="../../css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>body { font-family: 'Inter', var(--font-sans); }</style>
+</head>
+<body>
+
+<header class="site-header">
+    <a class="header-logo" href="../index.html">
+        <span class="logo-icon">&#x1F9E0;</span>
+        ARM CPU 仿真器手册
+    </a>
+    <div class="header-search">
+        <span class="search-icon">&#x1F50D;</span>
+        <input type="text" placeholder="搜索文档... (Ctrl+K)" autocomplete="off">
+        <div class="search-results"></div>
+    </div>
+    <a class="lang-switch" href="../../part2-architecture/12-gem5-comparison.html" style="color:var(--text-secondary);font-size:0.85rem;text-decoration:none;margin-right:8px;">English</a>
+    <button class="menu-toggle" aria-label="Toggle menu">&#9776;</button>
+</header>
+
+<nav class="sidebar" id="sidebar">
+    <div class="nav-section">
+        <div class="nav-section-title">第一部分 &mdash; 使用指南</div>
+        <a class="nav-item" href="../part1-usage/01-quick-start.html">1. 快速开始</a>
+        <a class="nav-item" href="../part1-usage/02-cli-reference.html">2. CLI 参数参考</a>
+        <a class="nav-item" href="../part1-usage/03-input-formats.html">3. 输入格式</a>
+        <a class="nav-item" href="../part1-usage/04-writing-test-programs.html">4. 编写测试程序</a>
+        <a class="nav-item" href="../part1-usage/05-running-simulations.html">5. 运行仿真</a>
+        <a class="nav-item" href="../part1-usage/06-output-analysis.html">6. 输出与结果分析</a>
+        <a class="nav-item" href="../part1-usage/07-visualization.html">7. 可视化工具</a>
+        <a class="nav-item" href="../part1-usage/08-configuration-presets.html">8. 配置预设</a>
+        <a class="nav-item" href="../part1-usage/09-benchmarks.html">9. 基准测试</a>
+        <a class="nav-item" href="../part1-usage/10-automation-scripts.html">10. 自动化脚本</a>
+        <a class="nav-item" href="../part1-usage/11-faq.html">11. 常见问题与排错</a>
+    </div>
+    <div class="nav-section">
+        <div class="nav-section-title">第二部分 &mdash; 架构文档</div>
+        <a class="nav-item" href="01-system-overview.html">1. 系统概览</a>
+        <a class="nav-item" href="02-cpu-pipeline.html">2. CPU 流水线</a>
+        <a class="nav-item" href="03-ooo-engine.html">3. 乱序执行引擎</a>
+        <a class="nav-item" href="04-instruction-decoder.html">4. 指令解码器</a>
+        <a class="nav-item" href="05-memory-hierarchy.html">5. 内存层次结构</a>
+        <a class="nav-item" href="06-elf-loader.html">6. ELF 加载器</a>
+        <a class="nav-item" href="07-statistics.html">7. 统计收集系统</a>
+        <a class="nav-item" href="08-visualization-system.html">8. 可视化系统</a>
+        <a class="nav-item" href="09-chi-coherence.html">9. CHI 一致性协议</a>
+        <a class="nav-item" href="10-type-system.html">10. 类型系统</a>
+        <a class="nav-item" href="11-input-sources.html">11. 输入源接口</a>
+        <a class="nav-item active" href="12-gem5-comparison.html">12. 与 GEM5 对比</a>
+    </div>
+</nav>
+
+<main class="main-content">
+    <div class="content-wrapper">
+
+        <div class="breadcrumb">
+            <a href="../index.html">首页</a>
+            <span class="sep">&rsaquo;</span>
+            <a href="../index.html">架构文档</a>
+            <span class="sep">&rsaquo;</span>
+            与 GEM5 对比
+        </div>
+
+        <div class="page-header">
+            <h1>与 GEM5 对比</h1>
+            <p class="page-desc">与 GEM5 仿真器的交叉验证，包括配置对齐、比较脚本和已知的架构差异。</p>
+        </div>
+
+        <p>仿真器可以配置为匹配 GEM5 的 <code>O3_ARM_v7a</code> CPU 模型，实现两个仿真器之间时序结果的交叉验证。这对于验证正确性和理解我们模型中的简化如何影响精度非常有用。</p>
+
+        <h2>配置对齐</h2>
+
+        <p>使用 <code>--preset gem5_o3_arm_v7a</code> 将我们的仿真器参数与 GEM5 默认值对齐：</p>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>参数</th>
+                    <th>本仿真器</th>
+                    <th>GEM5 O3_ARM_v7a</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>ROB 大小</td>
+                    <td>40</td>
+                    <td>40</td>
+                </tr>
+                <tr>
+                    <td>Fetch 宽度</td>
+                    <td>3</td>
+                    <td>3</td>
+                </tr>
+                <tr>
+                    <td>Issue 宽度</td>
+                    <td>8</td>
+                    <td>8</td>
+                </tr>
+                <tr>
+                    <td>Commit 宽度</td>
+                    <td>8</td>
+                    <td>8</td>
+                </tr>
+                <tr>
+                    <td>Load Queue</td>
+                    <td>16</td>
+                    <td>16</td>
+                </tr>
+                <tr>
+                    <td>Store Queue</td>
+                    <td>16</td>
+                    <td>16</td>
+                </tr>
+                <tr>
+                    <td>ICache</td>
+                    <td>&mdash;</td>
+                    <td>32 KB, 2 路</td>
+                </tr>
+                <tr>
+                    <td>DCache</td>
+                    <td>32 KB, 2 路</td>
+                    <td>32 KB, 2 路</td>
+                </tr>
+                <tr>
+                    <td>L2 Cache</td>
+                    <td>1 MB, 16 路</td>
+                    <td>1 MB, 16 路</td>
+                </tr>
+                <tr>
+                    <td>L1 命中延迟</td>
+                    <td>2 周期</td>
+                    <td>约 2 周期</td>
+                </tr>
+                <tr>
+                    <td>L2 命中延迟</td>
+                    <td>20 周期</td>
+                    <td>约 20 周期</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <div class="callout callout-warning">
+            <div class="callout-title">关键结构差异</div>
+            <p>GEM5 O3_ARM_v7a 具有<strong>分离的 ICache 和 DCache</strong>；我们的仿真器使用<strong>统一 L1</strong>。GEM5 在此配置中没有 L3；我们的仿真器保留默认的 L3。这些差异会影响 Cache 竞争建模。</p>
+        </div>
+
+        <h2>比较脚本</h2>
+
+        <p>项目包含一个 Python 脚本 <code>scripts/compare_gem5.py</code>，用于并排比较两个仿真器的输出：</p>
+
+        <pre><code>python3 scripts/compare_gem5.py \
+    --ours output.json \
+    --gem5 gem5_stats.txt</code></pre>
+
+        <h2>比较维度</h2>
+
+        <p>比较脚本评估以下指标：</p>
+        <ul>
+            <li><strong>周期数：</strong>完成仿真的总模拟周期数</li>
+            <li><strong>指令数：</strong>执行的总指令数</li>
+            <li><strong>IPC（每周期指令数）：</strong>整体吞吐量指标</li>
+            <li><strong>执行时间：</strong>每个仿真器的实际运行时间</li>
+        </ul>
+
+        <h2>已知差异</h2>
+
+        <h3>1. 分支预测</h3>
+        <p>我们的仿真器使用 <code>FunctionalSim</code>（通过预执行实现完美预测），而 GEM5 使用可配置的分支预测器（默认：tournament）。这可能导致显著的 IPC 差异，因为完美预测消除了所有分支预测错误的代价。</p>
+
+        <h3>2. Cache 模型</h3>
+        <p>我们的 L1 Cache 是统一的（指令 + 数据），而 GEM5 具有分离的 ICache 和 DCache。这会影响 Cache 竞争建模，因为指令获取和数据访问在我们的模型中竞争相同的 Cache 空间，而在 GEM5 中是隔离的。</p>
+
+        <h3>3. L3 Cache</h3>
+        <p>我们的仿真器始终在层次结构中包含 L3 Cache，而 GEM5 O3_ARM_v7a 不配置 L3。这可能导致不同的未命中率和内存访问模式。</p>
+
+        <h3>4. 时序粒度</h3>
+        <p>我们的仿真器使用整数周期计数，而 GEM5 可能对某些操作具有亚周期时序。即使整体行为相似，这也可能导致周期计数上的微小差异。</p>
+
+        <h3>5. 内存模型</h3>
+        <p>我们的 DDR 模型包含行缓冲区时序和 Bank 冲突，而 GEM5 使用不同的内存时序模型（通常为 <code>SimpleMemory</code> 或 <code>DRAMCtrl</code>）。详细的时序参数可能有所不同。</p>
+
+        <h3>6. 指令覆盖范围</h3>
+        <p>我们基于 Capstone 的解码器覆盖约 500 个 ARM64 助记符，而 GEM5 的 ISA 解析器更为全面。Capstone 无法解码的罕见或特权指令可能被不同地处理。</p>
+
+        <h2>带有 GEM5 变体的基准测试程序</h2>
+
+        <p><code>benchmarks/</code> 目录包含每个基准测试的 <code>_gem5_se</code> 变体，预配置为 GEM5 的 SE（System-Emulation）模式。这些变体允许直接比较：</p>
+
+        <pre><code>benchmarks/dhrystone/dhrystone_gem5_se
+benchmarks/fibonacci/fibonacci_gem5_se
+benchmarks/matmul/matmul_gem5_se
+# ...以及其他基准测试</code></pre>
+
+        <h2>有效比较的建议</h2>
+
+        <ol>
+            <li><strong>使用相同的二进制文件：</strong>我们的 <code>_aarch64</code> 和 <code>_gem5_se</code> 变体从相同源代码编译，确保指令级别的等价性。</li>
+            <li><strong>设置相同的限制：</strong>在两个仿真器中配置相同的最大指令数（<code>-n</code>）和最大周期数（<code>-c</code>）限制。</li>
+            <li><strong>考虑分支预测差异：</strong>我们的完美分支预测（通过 FunctionalSim）通常会比 GEM5 的 tournament 预测器显示更高的 IPC。应关注 Cache 行为以获得更具可比性的指标。</li>
+            <li><strong>比较 Cache 指标：</strong>Cache 命中率和 MPKI（每千条指令的未命中次数）在两个仿真器之间比原始 IPC 更具可比性，因为它们受分支预测差异的影响较小。</li>
+            <li><strong>使用比较脚本：</strong>运行 <code>scripts/compare_gem5.py</code> 以获得标准化的输出格式和指标对齐。</li>
+        </ol>
+
+        <div class="page-nav">
+            <a class="nav-prev" href="11-input-sources.html">
+                <span class="nav-label">上一页</span>
+                <span class="nav-title">&larr; 输入源接口</span>
+            </a>
+            <div></div>
+        </div>
+
+        <div class="content-footer">
+            ARM CPU 仿真器手册 &mdash; 基于 C++20、CMake 构建，致力于计算机架构研究。
+        </div>
+    </div>
+</main>
+
+<script src="../../js/main.js"></script>
+</body>
+</html>

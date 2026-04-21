@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CLI 参数参考 - ARM CPU 仿真器手册</title>
+    <link rel="stylesheet" href="../../css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>body { font-family: 'Inter', var(--font-sans); }</style>
+</head>
+<body>
+
+<header class="site-header">
+    <a class="header-logo" href="../index.html">
+        <span class="logo-icon">&#x1F9E0;</span>
+        ARM CPU 仿真器手册
+    </a>
+    <div class="header-search">
+        <span class="search-icon">&#x1F50D;</span>
+        <input type="text" placeholder="搜索文档... (Ctrl+K)" autocomplete="off">
+        <div class="search-results"></div>
+    </div>
+    <a class="lang-switch" href="../../part1-usage/02-cli-reference.html" style="color:var(--text-secondary);font-size:0.85rem;text-decoration:none;margin-right:8px;">English</a>
+    <button class="menu-toggle" aria-label="Toggle menu">&#9776;</button>
+</header>
+
+<nav class="sidebar" id="sidebar">
+    <div class="nav-section">
+        <div class="nav-section-title">第一部分 &mdash; 使用指南</div>
+        <a class="nav-item" href="01-quick-start.html">1. 快速开始</a>
+        <a class="nav-item active" href="02-cli-reference.html">2. CLI 参数参考</a>
+        <a class="nav-item" href="03-input-formats.html">3. 输入格式</a>
+        <a class="nav-item" href="04-writing-test-programs.html">4. 编写测试程序</a>
+        <a class="nav-item" href="05-running-simulations.html">5. 运行仿真</a>
+        <a class="nav-item" href="06-output-analysis.html">6. 输出与结果分析</a>
+        <a class="nav-item" href="07-visualization.html">7. 可视化工具</a>
+        <a class="nav-item" href="08-configuration-presets.html">8. 配置预设</a>
+        <a class="nav-item" href="09-benchmarks.html">9. 基准测试</a>
+        <a class="nav-item" href="10-automation-scripts.html">10. 自动化脚本</a>
+        <a class="nav-item" href="11-faq.html">11. 常见问题与排错</a>
+    </div>
+    <div class="nav-section">
+        <div class="nav-section-title">第二部分 &mdash; 架构文档</div>
+        <a class="nav-item" href="../part2-architecture/01-system-overview.html">1. 系统概览</a>
+        <a class="nav-item" href="../part2-architecture/02-cpu-pipeline.html">2. CPU 流水线</a>
+        <a class="nav-item" href="../part2-architecture/03-ooo-engine.html">3. 乱序执行引擎</a>
+        <a class="nav-item" href="../part2-architecture/04-instruction-decoder.html">4. 指令解码器</a>
+        <a class="nav-item" href="../part2-architecture/05-memory-hierarchy.html">5. 内存层次结构</a>
+        <a class="nav-item" href="../part2-architecture/06-elf-loader.html">6. ELF 加载器</a>
+        <a class="nav-item" href="../part2-architecture/07-statistics.html">7. 统计收集系统</a>
+        <a class="nav-item" href="../part2-architecture/08-visualization-system.html">8. 可视化系统</a>
+        <a class="nav-item" href="../part2-architecture/09-chi-coherence.html">9. CHI 一致性协议</a>
+        <a class="nav-item" href="../part2-architecture/10-type-system.html">10. 类型系统</a>
+        <a class="nav-item" href="../part2-architecture/11-input-sources.html">11. 输入源接口</a>
+        <a class="nav-item" href="../part2-architecture/12-gem5-comparison.html">12. 与 GEM5 对比</a>
+    </div>
+</nav>
+
+<main class="main-content">
+    <div class="content-wrapper">
+
+        <div class="breadcrumb">
+            <a href="../index.html">首页</a>
+            <span class="sep">&rsaquo;</span>
+            <a href="../index.html">使用指南</a>
+            <span class="sep">&rsaquo;</span>
+            CLI 参数参考
+        </div>
+
+        <div class="page-header">
+            <h1>CLI 参数参考</h1>
+            <p class="page-desc">ARM CPU 仿真器二进制文件的完整命令行接口参考。</p>
+        </div>
+
+        <h2>快速参考</h2>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>参数</th>
+                    <th>默认值</th>
+                    <th>说明</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr><td><code>-f, --format &lt;type&gt;</code></td><td><code>text</code></td><td>输入格式（elf、text、champsim、champsim_xz、json）</td></tr>
+                <tr><td><code>&lt;trace_file&gt;</code></td><td>&mdash;</td><td>trace/ELF 文件路径（位置参数）</td></tr>
+                <tr><td><code>-n, --max-instructions &lt;N&gt;</code></td><td><code>0</code></td><td>最大仿真指令数（0 = 全部）</td></tr>
+                <tr><td><code>-s, --skip-instructions &lt;N&gt;</code></td><td><code>0</code></td><td>跳过前 N 条指令</td></tr>
+                <tr><td><code>-c, --max-cycles &lt;N&gt;</code></td><td><code>1000000</code></td><td>最大仿真周期数</td></tr>
+                <tr><td><code>--window-size &lt;N&gt;</code></td><td><code>128</code></td><td>Reorder Buffer / 指令窗口大小</td></tr>
+                <tr><td><code>--fetch-width &lt;N&gt;</code></td><td><code>8</code></td><td>每周期取指宽度</td></tr>
+                <tr><td><code>--issue-width &lt;N&gt;</code></td><td><code>4</code></td><td>每周期发射宽度</td></tr>
+                <tr><td><code>--commit-width &lt;N&gt;</code></td><td><code>4</code></td><td>每周期提交宽度</td></tr>
+                <tr><td><code>--l1-size &lt;KB&gt;</code></td><td><code>64</code></td><td>L1 数据 Cache 大小（KB）</td></tr>
+                <tr><td><code>--l2-size &lt;KB&gt;</code></td><td><code>512</code></td><td>L2 Cache 大小（KB）</td></tr>
+                <tr><td><code>--l3-size &lt;KB&gt;</code></td><td><code>8192</code></td><td>L3 Cache 大小（KB）</td></tr>
+                <tr><td><code>--frequency &lt;MHz&gt;</code></td><td><code>2000</code></td><td>CPU 时钟频率（MHz）</td></tr>
+                <tr><td><code>-o, --output &lt;path&gt;</code></td><td><code>output.json</code></td><td>输出 JSON 文件路径</td></tr>
+                <tr><td><code>-j, --json-metrics</code></td><td>&mdash;</td><td>将性能指标 JSON 输出到 stdout</td></tr>
+                <tr><td><code>--save-trace</code></td><td>&mdash;</td><td>保存详细执行追踪</td></tr>
+                <tr><td><code>--dump-range &lt;start&gt;:&lt;end&gt;</code></td><td>&mdash;</td><td>导出指定指令范围的 Pipeline 追踪</td></tr>
+                <tr><td><code>-p, --port &lt;port&gt;</code></td><td>&mdash;</td><td>启动可视化 Web 服务器</td></tr>
+                <tr><td><code>-e, --event-mode</code></td><td>&mdash;</td><td>事件驱动模式（无可视化，无 Konata 导出）</td></tr>
+                <tr><td><code>--multi-instance</code></td><td>&mdash;</td><td>启用多实例模式</td></tr>
+                <tr><td><code>--num-instances &lt;N&gt;</code></td><td><code>4</code></td><td>仿真实例数量</td></tr>
+                <tr><td><code>--num-threads &lt;N&gt;</code></td><td>auto</td><td>线程数</td></tr>
+                <tr><td><code>--preset &lt;name&gt;</code></td><td>&mdash;</td><td>配置预设（default、high_performance、minimal、gem5_o3_arm_v7a）</td></tr>
+                <tr><td><code>-m, --memory-size &lt;MB&gt;</code></td><td><code>256</code></td><td>ELF 仿真内存大小（MB）</td></tr>
+                <tr><td><code>--viz-format &lt;fmt&gt;</code></td><td>&mdash;</td><td>可视化格式（konata、perf）</td></tr>
+                <tr><td><code>-v, --verbose</code></td><td>&mdash;</td><td>详细输出模式</td></tr>
+            </tbody>
+        </table>
+
+        <h2>用法语法</h2>
+
+        <pre><code>arm_cpu_sim [options] &lt;trace_file&gt;</code></pre>
+
+        <p>trace 文件以位置参数的形式提供。所有其他参数以标志位的形式传递。参数的顺序可以任意排列。</p>
+
+        <h2>输入控制</h2>
+
+        <p>以下选项控制仿真器如何读取和处理输入指令。</p>
+
+        <div class="cli-table">
+            <div class="cli-row">
+                <div class="cli-flag"><code>-f, --format &lt;type&gt;</code></div>
+                <div class="cli-desc">选择输入格式。支持的值：<code>elf</code>、<code>text</code>、<code>champsim</code>、<code>champsim_xz</code>、<code>json</code>。默认为 <code>text</code>。详见 <a href="03-input-formats.html">输入格式</a>。</div>
+            </div>
+            <div class="cli-row">
+                <div class="cli-flag"><code>&lt;trace_file&gt;</code></div>
+                <div class="cli-desc">位置参数，指定输入文件的路径（ELF 二进制、text trace、ChampSim trace 或 JSON trace）。这是运行仿真唯一必需的参数。</div>
+            </div>
+            <div class="cli-row">
+                <div class="cli-flag"><code>-n, --max-instructions &lt;N&gt;</code></div>
+                <div class="cli-desc">最大仿真指令数。值为 <code>0</code>（默认）表示仿真输入中的所有指令。适用于快速基准测试或限制仿真时间。</div>
+            </div>
+            <div class="cli-row">
+                <div class="cli-flag"><code>-s, --skip-instructions &lt;N&gt;</code></div>
+                <div class="cli-desc">在开始仿真前跳过输入中的前 N 条指令。适用于跳过初始化代码或预热阶段。默认为 <code>0</code>。</div>
+            </div>
+            <div class="cli-row">
+                <div class="cli-flag"><code>-c, --max-cycles &lt;N&gt;</code></div>
+                <div class="cli-desc">仿真器终止前的最大仿真周期数。作为安全限制防止无限循环。默认为 <code>1000000</code>（100 万周期）。</div>
+            </div>
+        </div>
+
+        <h2>CPU 配置</h2>
+
+        <p>以下选项配置仿真 CPU 流水线的微架构参数。</p>
+
+        <div class="cli-table">
+            <div class="cli-row">
+                <div class="cli-flag"><code>--window-size &lt;N&gt;</code></div>
+                <div class="cli-desc">Reorder Buffer（ROB）/ 指令窗口大小。决定了同时处于飞行状态的指令数量。更大的值允许更多的指令级并行（ILP），但会增加资源开销。默认为 <code>128</code>。</div>
+            </div>
+            <div class="cli-row">
+                <div class="cli-flag"><code>--fetch-width &lt;N&gt;</code></div>
+                <div class="cli-desc">每周期从指令流中取指的指令数。默认为 <code>8</code>。典型值范围从 4（顺序核心）到 8（宽超标量核心）。</div>
+            </div>
+            <div class="cli-row">
+                <div class="cli-flag"><code>--issue-width &lt;N&gt;</code></div>
+                <div class="cli-desc">每周期发射到执行单元的最大指令数。默认为 <code>4</code>。这是调度器的峰值发射带宽。</div>
+            </div>
+            <div class="cli-row">
+                <div class="cli-flag"><code>--commit-width &lt;N&gt;</code></div>
+                <div class="cli-desc">每周期从 ROB 提交的最大指令数。默认为 <code>4</code>。在实际配置中通常与发射宽度一致。</div>
+            </div>
+        </div>
+
+        <div class="callout callout-tip">
+            <div class="callout-title">预设会覆盖单独设置</div>
+            <p>使用 <code>--preset &lt;name&gt;</code> 将覆盖所有单独指定的 CPU 和内存配置参数。建议先应用预设，再按需覆盖特定值。</p>
+        </div>
+
+        <h2>内存配置</h2>
+
+        <p>以下选项配置 Cache 层次结构和内存子系统时序。</p>
+
+        <div class="cli-table">
+            <div class="cli-row">
+                <div class="cli-flag"><code>--l1-size &lt;KB&gt;</code></div>
+                <div class="cli-desc">L1 数据 Cache 大小（KB）。默认为 <code>64</code> KB。L1 Cache 是距离 CPU 核心最近的 Cache，延迟最低。</div>
+            </div>
+            <div class="cli-row">
+                <div class="cli-flag"><code>--l2-size &lt;KB&gt;</code></div>
+                <div class="cli-desc">L2 Cache 大小（KB）。默认为 <code>512</code> KB。L2 Cache 作为 L1 和 L3 之间的中间层 Cache。</div>
+            </div>
+            <div class="cli-row">
+                <div class="cli-flag"><code>--l3-size &lt;KB&gt;</code></div>
+                <div class="cli-desc">L3（最后一级）Cache 大小（KB）。默认为 <code>8192</code> KB（8 MB）。L3 Cache 在多核配置中跨核心共享。</div>
+            </div>
+            <div class="cli-row">
+                <div class="cli-flag"><code>--frequency &lt;MHz&gt;</code></div>
+                <div class="cli-desc">CPU 时钟频率（MHz）。默认为 <code>2000</code> MHz（2 GHz）。该值用于计算时序指标和功耗估算。</div>
+            </div>
+        </div>
+
+        <h2>输出控制</h2>
+
+        <p>以下选项控制仿真器的输出内容和写入位置。</p>
+
+        <div class="cli-table">
+            <div class="cli-row">
+                <div class="cli-flag"><code>-o, --output &lt;path&gt;</code></div>
+                <div class="cli-desc">输出 JSON 文件路径。该文件包含仿真统计信息、Pipeline 追踪数据和 Konata 可视化数据。默认为当前工作目录下的 <code>output.json</code>。</div>
+            </div>
+            <div class="cli-row">
+                <div class="cli-flag"><code>-j, --json-metrics</code></div>
+                <div class="cli-desc">同时将性能指标摘要以 JSON 格式输出到标准输出（stdout）。适用于程序化处理和脚本管道。</div>
+            </div>
+            <div class="cli-row">
+                <div class="cli-flag"><code>--save-trace</code></div>
+                <div class="cli-desc">启用输出文件中的详细执行追踪。包含逐指令时序信息和 Pipeline 阶段转换记录。</div>
+            </div>
+            <div class="cli-row">
+                <div class="cli-flag"><code>--dump-range &lt;start&gt;:&lt;end&gt;</code></div>
+                <div class="cli-desc">仅导出指定范围（含边界）内指令的 Pipeline 追踪。格式为 <code>start:end</code>。例如 <code>--dump-range 100:200</code> 导出第 100 到第 200 条指令。适用于调试特定指令序列。</div>
+            </div>
+        </div>
+
+        <h2>可视化</h2>
+
+        <p>以下选项控制可视化和 Web 服务器功能。</p>
+
+        <div class="cli-table">
+            <div class="cli-row">
+                <div class="cli-flag"><code>-p, --port &lt;port&gt;</code></div>
+                <div class="cli-desc">在指定端口启动内置 HTTP 服务器，提供 Konata 可视化界面。在浏览器中打开 <code>http://localhost:&lt;port&gt;</code> 查看 Pipeline 时间线。可视化页面会自动加载仿真输出数据。</div>
+            </div>
+            <div class="cli-row">
+                <div class="cli-flag"><code>-e, --event-mode</code></div>
+                <div class="cli-desc">启用事件驱动（SimulationEngine）模式。在此模式下，仿真器将 <code>SimulationEvent</code> 对象发送到可插拔的 Sink，而非运行完整的 CPUEmulator 路径。此模式禁用 Konata 可视化导出，适用于分析场景。</div>
+            </div>
+            <div class="cli-row">
+                <div class="cli-flag"><code>--viz-format &lt;fmt&gt;</code></div>
+                <div class="cli-desc">选择可视化输出格式。支持的值：<code>konata</code>（Konata Pipeline 时间线 JSON）、<code>perf</code>（性能统计格式）。默认格式为 Konata。</div>
+            </div>
+        </div>
+
+        <h2>多实例仿真</h2>
+
+        <p>以下选项启用并行运行多个独立仿真实例，适用于设计空间探索。</p>
+
+        <div class="cli-table">
+            <div class="cli-row">
+                <div class="cli-flag"><code>--multi-instance</code></div>
+                <div class="cli-desc">启用多实例仿真模式。每个实例使用独立的配置和输入运行。需要指定 <code>--num-instances</code> 并提供独立的输入文件。</div>
+            </div>
+            <div class="cli-row">
+                <div class="cli-flag"><code>--num-instances &lt;N&gt;</code></div>
+                <div class="cli-desc">要运行的仿真实例数量。默认为 <code>4</code>。仅在启用 <code>--multi-instance</code> 时有效。</div>
+            </div>
+            <div class="cli-row">
+                <div class="cli-flag"><code>--num-threads &lt;N&gt;</code></div>
+                <div class="cli-desc">并行执行使用的线程数。默认根据可用 CPU 核心数自动检测。可以手动设置以获得更精细的控制。</div>
+            </div>
+        </div>
+
+        <h2>预设配置</h2>
+
+        <div class="cli-table">
+            <div class="cli-row">
+                <div class="cli-flag"><code>--preset &lt;name&gt;</code></div>
+                <div class="cli-desc">应用命名配置预设，一次性设置 CPU 流水线、Cache 和内存参数。可用预设：</div>
+            </div>
+        </div>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>预设名称</th>
+                    <th>说明</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><code>default</code></td>
+                    <td>均衡配置：128 条目 ROB、8 宽取指、4 宽发射/提交、64 KB L1、512 KB L2、8 MB L3</td>
+                </tr>
+                <tr>
+                    <td><code>high_performance</code></td>
+                    <td>激进的乱序配置，具有更大的窗口和 Cache，追求最大 IPC</td>
+                </tr>
+                <tr>
+                    <td><code>minimal</code></td>
+                    <td>最小配置，结构精简，适用于快速仿真迭代</td>
+                </tr>
+                <tr>
+                    <td><code>gem5_o3_arm_v7a</code></td>
+                    <td>匹配 gem5 O3 ARM v7a CPU 模型的配置，用于跨仿真器对比</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <div class="callout callout-info">
+            <div class="callout-title">预设与单独参数的组合</div>
+            <p>预设值先被应用，然后显式指定的标志会覆盖对应的预设值。例如 <code>--preset high_performance --l1-size 32</code> 使用 high_performance 预设但将 L1 大小覆盖为 32 KB。</p>
+        </div>
+
+        <h2>其他选项</h2>
+
+        <div class="cli-table">
+            <div class="cli-row">
+                <div class="cli-flag"><code>-m, --memory-size &lt;MB&gt;</code></div>
+                <div class="cli-desc">ELF 仿真的总模拟内存大小（MB）。默认为 <code>256</code> MB。这是加载的 ELF 程序可用的模拟物理地址空间大小。如果程序需要访问更大的内存区域，请增加此值。</div>
+            </div>
+            <div class="cli-row">
+                <div class="cli-flag"><code>-t, --threads &lt;N&gt;</code></div>
+                <div class="cli-desc"><span class="badge badge-red">已弃用</span> 请使用 <code>--num-threads &lt;N&gt;</code>。此标志保留用于向后兼容，但可能在未来的版本中移除。</div>
+            </div>
+            <div class="cli-row">
+                <div class="cli-flag"><code>-v, --verbose</code></div>
+                <div class="cli-desc">启用详细输出。在仿真过程中打印额外信息，包括逐周期状态、Cache 事件和 Pipeline 阶段转换。适用于调试和理解仿真器行为。</div>
+            </div>
+        </div>
+
+        <h2>示例命令</h2>
+
+        <h3>基本 ELF 仿真</h3>
+        <pre><code>./build/arm_cpu_sim -f elf tests/data/test_elf_aarch64</code></pre>
+
+        <h3>限制指令数并自定义输出</h3>
+        <pre><code>./build/arm_cpu_sim -f elf program.elf -n 10000 -o results/run1.json</code></pre>
+
+        <h3>高性能 CPU 配置</h3>
+        <pre><code>./build/arm_cpu_sim -f elf program.elf --preset high_performance -o results/hp.json</code></pre>
+
+        <h3>自定义 Pipeline 与可视化服务器</h3>
+        <pre><code>./build/arm_cpu_sim -f elf program.elf \
+  --window-size 256 --issue-width 6 --commit-width 6 \
+  --l1-size 128 --l2-size 1024 \
+  -p 8080 -o results/custom.json</code></pre>
+
+        <h3>事件驱动模式与 JSON 指标</h3>
+        <pre><code>./build/arm_cpu_sim -e -f elf program.elf -j</code></pre>
+
+        <h3>调试特定指令范围</h3>
+        <pre><code>./build/arm_cpu_sim -f elf program.elf --dump-range 50:100 -v</code></pre>
+
+        <div class="page-nav">
+            <a href="01-quick-start.html">
+                <span class="nav-label">上一页</span>
+                <span class="nav-title">&larr; 快速开始</span>
+            </a>
+            <a class="nav-next" href="03-input-formats.html">
+                <span class="nav-label">下一页</span>
+                <span class="nav-title">输入格式 &rarr;</span>
+            </a>
+        </div>
+
+        <div class="content-footer">
+            ARM CPU 仿真器手册 &mdash; 基于 C++20、CMake 构建，致力于计算机架构研究。
+        </div>
+    </div>
+</main>
+
+<script src="../../js/main.js"></script>
+</body>
+</html>

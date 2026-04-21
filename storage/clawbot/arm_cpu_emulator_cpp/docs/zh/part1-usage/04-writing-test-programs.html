@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>编写测试程序 - ARM CPU 仿真器手册</title>
+    <link rel="stylesheet" href="../../css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>body { font-family: 'Inter', var(--font-sans); }</style>
+</head>
+<body>
+
+<header class="site-header">
+    <a class="header-logo" href="../index.html">
+        <span class="logo-icon">&#x1F9E0;</span>
+        ARM CPU 仿真器手册
+    </a>
+    <div class="header-search">
+        <span class="search-icon">&#x1F50D;</span>
+        <input type="text" placeholder="搜索文档... (Ctrl+K)" autocomplete="off">
+        <div class="search-results"></div>
+    </div>
+    <a class="lang-switch" href="../../part1-usage/04-writing-test-programs.html" style="color:var(--text-secondary);font-size:0.85rem;text-decoration:none;margin-right:8px;">English</a>
+    <button class="menu-toggle" aria-label="Toggle menu">&#9776;</button>
+</header>
+
+<nav class="sidebar" id="sidebar">
+    <div class="nav-section">
+        <div class="nav-section-title">第一部分 &mdash; 使用指南</div>
+        <a class="nav-item" href="01-quick-start.html">1. 快速开始</a>
+        <a class="nav-item" href="02-cli-reference.html">2. CLI 参数参考</a>
+        <a class="nav-item" href="03-input-formats.html">3. 输入格式</a>
+        <a class="nav-item active" href="04-writing-test-programs.html">4. 编写测试程序</a>
+        <a class="nav-item" href="05-running-simulations.html">5. 运行仿真</a>
+        <a class="nav-item" href="06-output-analysis.html">6. 输出与结果分析</a>
+        <a class="nav-item" href="07-visualization.html">7. 可视化工具</a>
+        <a class="nav-item" href="08-configuration-presets.html">8. 配置预设</a>
+        <a class="nav-item" href="09-benchmarks.html">9. 基准测试</a>
+        <a class="nav-item" href="10-automation-scripts.html">10. 自动化脚本</a>
+        <a class="nav-item" href="11-faq.html">11. 常见问题与排错</a>
+    </div>
+    <div class="nav-section">
+        <div class="nav-section-title">第二部分 &mdash; 架构文档</div>
+        <a class="nav-item" href="../part2-architecture/01-system-overview.html">1. 系统概览</a>
+        <a class="nav-item" href="../part2-architecture/02-cpu-pipeline.html">2. CPU 流水线</a>
+        <a class="nav-item" href="../part2-architecture/03-ooo-engine.html">3. 乱序执行引擎</a>
+        <a class="nav-item" href="../part2-architecture/04-instruction-decoder.html">4. 指令解码器</a>
+        <a class="nav-item" href="../part2-architecture/05-memory-hierarchy.html">5. 内存层次结构</a>
+        <a class="nav-item" href="../part2-architecture/06-elf-loader.html">6. ELF 加载器</a>
+        <a class="nav-item" href="../part2-architecture/07-statistics.html">7. 统计收集系统</a>
+        <a class="nav-item" href="../part2-architecture/08-visualization-system.html">8. 可视化系统</a>
+        <a class="nav-item" href="../part2-architecture/09-chi-coherence.html">9. CHI 一致性协议</a>
+        <a class="nav-item" href="../part2-architecture/10-type-system.html">10. 类型系统</a>
+        <a class="nav-item" href="../part2-architecture/11-input-sources.html">11. 输入源接口</a>
+        <a class="nav-item" href="../part2-architecture/12-gem5-comparison.html">12. 与 GEM5 对比</a>
+    </div>
+</nav>
+
+<main class="main-content">
+    <div class="content-wrapper">
+
+        <div class="breadcrumb">
+            <a href="../index.html">首页</a>
+            <span class="sep">&rsaquo;</span>
+            <a href="../index.html">使用指南</a>
+            <span class="sep">&rsaquo;</span>
+            编写测试程序
+        </div>
+
+        <div class="page-header">
+            <h1>编写测试程序</h1>
+            <p class="page-desc">如何为仿真器编写裸机 ARM64 汇编和 C 程序，涵盖指令模式、编译和执行环境细节。</p>
+        </div>
+
+        <h2>裸机 ARM64 编程基础</h2>
+
+        <p>仿真器在裸机环境中执行 ARM64 ELF 二进制文件。没有操作系统、没有 libc、没有系统调用接口。程序直接运行在模拟硬件上。</p>
+
+        <h3>入口点</h3>
+
+        <p>入口点必须是 <code>_start</code> 符号。ELF 加载器从该符号解析的地址开始执行。如果找不到 <code>_start</code>，加载器将使用 ELF 文件头中的入口点。</p>
+
+        <pre><code>.global _start
+_start:
+    // 你的代码从这里开始
+    MOV X0, #42
+    // ...</code></pre>
+
+        <h3>ELF 段（Sections）</h3>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>段</th>
+                    <th>内容</th>
+                    <th>说明</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><code>.text</code></td>
+                    <td>可执行代码</td>
+                    <td>加载到模拟内存中由 Pipeline 执行的指令</td>
+                </tr>
+                <tr>
+                    <td><code>.data</code></td>
+                    <td>已初始化数据</td>
+                    <td>具有显式初始值的变量，从 ELF 文件加载</td>
+                </tr>
+                <tr>
+                    <td><code>.bss</code></td>
+                    <td>零初始化数据</td>
+                    <td>初始值为零的变量，已分配但未存储在 ELF 文件中</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>寄存器约定（AAPCS64）</h3>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>寄存器</th>
+                    <th>用途</th>
+                    <th>调用者/被调用者保存</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><code>X0</code> &ndash; <code>X7</code></td>
+                    <td>参数和返回值</td>
+                    <td>调用者保存</td>
+                </tr>
+                <tr>
+                    <td><code>X8</code></td>
+                    <td>间接结果位置寄存器</td>
+                    <td>调用者保存</td>
+                </tr>
+                <tr>
+                    <td><code>X9</code> &ndash; <code>X15</code></td>
+                    <td>临时/暂存寄存器</td>
+                    <td>调用者保存</td>
+                </tr>
+                <tr>
+                    <td><code>X16</code> &ndash; <code>X17</code></td>
+                    <td>过程内调用暂存寄存器</td>
+                    <td>调用者保存</td>
+                </tr>
+                <tr>
+                    <td><code>X18</code></td>
+                    <td>平台寄存器（保留）</td>
+                    <td>因平台而异</td>
+                </tr>
+                <tr>
+                    <td><code>X19</code> &ndash; <code>X28</code></td>
+                    <td>被调用者保存寄存器</td>
+                    <td>被调用者保存</td>
+                </tr>
+                <tr>
+                    <td><code>X29</code></td>
+                    <td>帧指针（FP）</td>
+                    <td>被调用者保存</td>
+                </tr>
+                <tr>
+                    <td><code>X30</code></td>
+                    <td>链接寄存器（LR）</td>
+                    <td>调用者保存</td>
+                </tr>
+                <tr>
+                    <td><code>SP</code></td>
+                    <td>栈指针</td>
+                    <td>特殊</td>
+                </tr>
+                <tr>
+                    <td><code>XZR</code>（WZR）</td>
+                    <td>零寄存器（读始终为 0）</td>
+                    <td>N/A</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <div class="callout callout-warning">
+            <div class="callout-title">程序终止</div>
+            <p>没有可用的 <code>exit()</code> 系统调用。仿真器在达到最大指令数（<code>-n</code>）或最大周期数（<code>-c</code>）时终止。请确保你的测试程序在这些限制内运行。</p>
+        </div>
+
+        <h2>常用指令模式</h2>
+
+        <h3>算术指令</h3>
+
+        <pre><code>ADD X0, X1, X2      // X0 = X1 + X2
+ADD X0, X1, #16     // X0 = X1 + 16（立即数操作数）
+SUB X3, X4, #16     // X3 = X4 - 16（立即数操作数）
+SUB X3, X4, X5      // X3 = X4 - X5
+MUL X5, X6, X7      // X5 = X6 * X7
+AND X8, X9, X10     // X8 = X9 &amp; X10（按位与）
+ORR X8, X9, X10     // X8 = X9 | X10（按位或）
+EOR X8, X9, X10     // X8 = X9 ^ X10（按位异或）
+LSL X8, X9, #3      // X8 = X9 &lt;&lt; 3（逻辑左移）
+LSR X8, X9, #5      // X8 = X9 &gt;&gt; 5（逻辑右移）
+ASR X8, X9, #2      // X8 = X9 &gt;&gt; 2（算术右移）
+MOV X0, X1           // X0 = X1（寄存器传送）
+MOV X0, #42          // X0 = 42（立即数传送）
+MVN X0, X1           // X0 = ~X1（按位取反）</code></pre>
+
+        <h3>内存访问指令</h3>
+
+        <pre><code>// Load 指令
+LDR X0, [X1, #0]    // 从地址 X1+0 加载 64 位值到 X0
+LDR X0, [X1, #8]    // 从地址 X1+8 加载 64 位值到 X0
+LDR W0, [X1, #4]    // 从地址 X1+4 加载 32 位值到 W0
+LDR X0, [X1, X2]    // 从地址 X1+X2 加载 64 位值（寄存器偏移）
+LDUR X0, [X1, #-1]  // 非缩放偏移加载（支持负偏移）
+
+// Store 指令
+STR X2, [X3, #8]    // 将 64 位 X2 存储到地址 X3+8
+STR W2, [X3, #4]    // 将 32 位 W2 存储到地址 X3+4
+STUR X0, [X1, #-1]  // 非缩放偏移存储
+
+// Load/Store Pair（一条指令操作两个寄存器）
+LDP X0, X1, [X2]    // 从 [X2] 加载 X0，从 [X2+8] 加载 X1
+LDP X0, X1, [X2, #16] // 从 [X2+16] 加载 X0，从 [X2+24] 加载 X1
+STP X0, X1, [X2]    // 将 X0 存到 [X2]，将 X1 存到 [X2+8]
+STP X0, X1, [X2, #16] // 将 X0 存到 [X2+16]，将 X1 存到 [X2+24]
+
+// 前索引和后索引
+LDR X0, [X1, #8]!   // 从 X1+8 加载，然后 X1 = X1+8（前索引）
+LDR X0, [X1], #8    // 从 X1 加载，然后 X1 = X1+8（后索引）</code></pre>
+
+        <h3>分支指令</h3>
+
+        <pre><code>B label              // 无条件分支到 label
+BL func              // 带链接的分支（将返回地址保存到 X30）
+RET                  // 返回到 X30 中的地址
+
+// 比较并分支
+CBZ X0, label        // 如果 X0 == 0 则分支到 label
+CBNZ X0, label       // 如果 X0 != 0 则分支到 label
+
+// 条件分支（在 CMP 或 SUBS 之后）
+B.EQ label           // 相等时分支（Z 标志置位）
+B.NE label           // 不等时分支（Z 标志清零）
+B.LT label           // 小于时分支（有符号）
+B.GT label           // 大于时分支（有符号）
+B.LE label           // 小于等于时分支（有符号）
+B.GE label           // 大于等于时分支（有符号）
+B.HI label           // 无符号高于时分支
+B.LS label           // 无符号低于或等于时分支
+
+// 比较指令（设置标志但不写回结果）
+CMP X0, X1           // 根据 X0 - X1 设置标志
+CMP X0, #42          // 根据 X0 - 42 设置标志
+
+// 条件选择
+CSEL X0, X1, X2, EQ  // X0 = (EQ) ? X1 : X2</code></pre>
+
+        <h3>浮点指令</h3>
+
+        <pre><code>FADD D0, D1, D2      // 双精度：D0 = D1 + D2
+FSUB D0, D1, D2      // 双精度：D0 = D1 - D2
+FMUL D0, D1, D2      // 双精度：D0 = D1 * D2
+FDIV D0, D1, D2      // 双精度：D0 = D1 / D2
+FADD S0, S1, S2      // 单精度：S0 = S1 + S2
+FMUL S0, S1, S2      // 单精度：S0 = S1 * S2
+FMOV D0, X0          // 整数到浮点寄存器的传送（重解释位模式）
+FMOV X0, D0          // 浮点寄存器到整数寄存器的传送</code></pre>
+
+        <h3>SIMD 指令</h3>
+
+        <pre><code>// 128 位向量操作（NEON）
+ADD V0.4S, V1.4S, V2.4S  // 4 x 32 位整数加法
+ADD V0.2D, V1.2D, V2.2D  // 2 x 64 位整数加法
+SUB V0.8B, V1.8B, V2.8B  // 8 x 8 位整数减法
+MUL V0.4S, V1.4S, V2.4S  // 4 x 32 位整数乘法
+
+// SIMD Load/Store
+LDR Q0, [X1]         // 从内存加载 128 位向量
+STR Q0, [X2]         // 将 128 位向量存储到内存</code></pre>
+
+        <h3>内存屏障指令</h3>
+
+        <pre><code>DMB ISH              // 数据内存屏障（Inner Shareable）
+                       // 确保内存访问按顺序被
+                       // Inner Shareable 域中的其他观察者感知
+
+DSB ISH              // 数据同步屏障（Inner Shareable）
+                       // 阻塞执行直到所有内存访问完成
+
+ISB                  // 指令同步屏障
+                       // 刷新指令 Pipeline，确保
+                       // 后续指令在屏障之后取指</code></pre>
+
+        <h2>完整示例程序</h2>
+
+        <p>以下示例演示了一个简单的循环，计算内存中的数组求和：</p>
+
+        <pre><code>.global _start
+
+.section .data
+array:
+    .quad 10, 20, 30, 40, 50    // 5 个元素
+size = (. - array) / 8           // 元素数量
+
+.section .bss
+result:
+    .skip 8                      // 64 位结果变量
+
+.section .text
+_start:
+    LDR X0, =array               // X0 = 数组地址
+    LDR X1, =size                // X1 = 元素数量
+    LDR X2, =result              // X2 = 结果地址
+    MOV X3, #0                   // X3 = 求和累加器 = 0
+    MOV X4, #0                   // X4 = 循环索引 = 0
+
+loop:
+    CMP X4, X1                   // 比较索引与大小
+    B.GE done                    // 如果索引 >= 大小，退出循环
+
+    LDR X5, [X0, X4, LSL #3]    // 加载 array[index]（X4 * 8 字节偏移）
+    ADD X3, X3, X5               // sum += array[index]
+    ADD X4, X4, #1               // index++
+    B loop                       // 重复
+
+done:
+    STR X3, [X2]                 // 将结果存储到内存
+    B done                       // 无限循环（仿真器通过 -n 或 -c 终止）</code></pre>
+
+        <h2>编译</h2>
+
+        <h3>使用提供的脚本（推荐）</h3>
+
+        <p>项目包含一个便捷脚本，自动检测交叉编译器并编译内置测试源码：</p>
+
+        <pre><code>./scripts/compile_test_elf.sh</code></pre>
+
+        <p>该脚本会在 <code>PATH</code> 中搜索 <code>aarch64-elf-gcc</code>、<code>aarch64-linux-gnu-gcc</code> 或 <code>aarch64-none-elf-gcc</code>，并将 <code>scripts/test_elf_source.c</code> 编译为 <code>tests/data/test_elf_aarch64</code>。</p>
+
+        <h3>手动编译</h3>
+
+        <pre><code># macOS（使用 Homebrew 的 aarch64-elf-gcc）
+aarch64-elf-gcc -static -O2 -nostdlib -o program program.s
+
+# Linux（使用 aarch64-linux-gnu-gcc）
+aarch64-linux-gnu-gcc -static -O2 -nostdlib -o program program.s
+
+# macOS/Linux（使用 aarch64-none-elf-gcc）
+aarch64-none-elf-gcc -static -O2 -nostdlib -o program program.s
+
+# 直接编译 C 源码（裸机）
+aarch64-elf-gcc -static -O2 -nostdlib -o program program.c</code></pre>
+
+        <div class="callout callout-tip">
+            <div class="callout-title">编译器标志说明</div>
+            <ul style="margin-bottom:0;">
+                <li><code>-static</code> &mdash; 静态链接（无动态库依赖）</li>
+                <li><code>-O2</code> &mdash; 优化级别 2（产生典型的真实世界指令模式）</li>
+                <li><code>-nostdlib</code> &mdash; 不链接标准库（无 libc、无启动代码）</li>
+            </ul>
+        </div>
+
+        <h3>测试用优化级别</h3>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>标志</th>
+                    <th>效果</th>
+                    <th>适用场景</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><code>-O0</code></td>
+                    <td>无优化，指令字面映射</td>
+                    <td>验证单条指令行为</td>
+                </tr>
+                <tr>
+                    <td><code>-O1</code></td>
+                    <td>基本优化</td>
+                    <td>带有一些编译器变换的轻量测试</td>
+                </tr>
+                <tr>
+                    <td><code>-O2</code></td>
+                    <td>标准优化</td>
+                    <td>推荐用于真实的仿真负载</td>
+                </tr>
+                <tr>
+                    <td><code>-O3</code></td>
+                    <td>激进优化，包括向量化</td>
+                    <td>最大 ILP 和 SIMD 使用测试</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>内置测试源码</h2>
+
+        <p>项目在 <code>scripts/test_elf_source.c</code> 中包含一个全面的测试源文件，覆盖所有主要指令类别：</p>
+
+        <ul>
+            <li><strong>ALU 操作</strong> &mdash; ADD、SUB、MUL、AND、ORR、EOR、移位、传送</li>
+            <li><strong>Load/Store</strong> &mdash; LDR、STR、LDP、STP，含多种寻址模式</li>
+            <li><strong>分支</strong> &mdash; 条件分支、比较并分支、函数调用</li>
+            <li><strong>浮点运算</strong> &mdash; FADD、FSUB、FMUL、FDIV，单精度和双精度</li>
+            <li><strong>SIMD</strong> &mdash; NEON 指令的向量运算</li>
+            <li><strong>屏障</strong> &mdash; DMB、DSB、ISB 内存和指令同步屏障</li>
+        </ul>
+
+        <p>该文件由 <code>scripts/compile_test_elf.sh</code> 编译，生成的二进制文件位于 <code>tests/data/test_elf_aarch64</code>。</p>
+
+        <h2>注意事项</h2>
+
+        <div class="callout callout-warning">
+            <div class="callout-title">模拟内存空间</div>
+            <p>程序运行在模拟的物理地址空间中。默认大小为 256 MB，可通过 <code>-m &lt;MB&gt;</code> 配置。所有代码、数据和栈必须在此空间内。如果程序访问超出分配范围的内存，仿真器将报告内存错误。</p>
+        </div>
+
+        <div class="callout callout-warning">
+            <div class="callout-title">无 OS 服务</div>
+            <p>这是纯粹的裸机执行。没有系统调用、没有 <code>printf</code>、没有文件 I/O、没有定时器、没有中断处理。所有数据必须静态初始化或在程序运行时计算。</p>
+        </div>
+
+        <div class="callout callout-info">
+            <div class="callout-title">栈指针设置</div>
+            <p>栈指针（SP）由 ELF 加载器初始化到模拟内存区域的顶部。但如果你的程序使用深度嵌套的函数调用或大型栈帧，请确保栈有足够的空间。你也可以在 <code>_start</code> 例程中手动将 SP 设置为特定地址。</p>
+        </div>
+
+        <div class="callout callout-tip">
+            <div class="callout-title">终止策略</div>
+            <p>由于没有退出机制，请在测试程序末尾设计一个无限循环（<code>B .</code>），并使用 <code>-n &lt;N&gt;</code> 或 <code>-c &lt;N&gt;</code> 限制仿真长度。或者，使用自然耗尽指令计数的有限循环。</p>
+        </div>
+
+        <h2>运行你的程序</h2>
+
+        <pre><code># 编译
+aarch64-elf-gcc -static -O2 -nostdlib -o my_program my_program.s
+
+# 仿真（输入：my_program，输出：output.json）
+./build/arm_cpu_sim -f elf my_program -o output.json
+
+# 仿真并限制指令数，同时启动可视化
+./build/arm_cpu_sim -f elf my_program -n 10000 -p 3000 -o output.json</code></pre>
+
+        <div class="page-nav">
+            <a href="03-input-formats.html">
+                <span class="nav-label">上一页</span>
+                <span class="nav-title">&larr; 输入格式</span>
+            </a>
+            <a class="nav-next" href="05-running-simulations.html">
+                <span class="nav-label">下一页</span>
+                <span class="nav-title">运行仿真 &rarr;</span>
+            </a>
+        </div>
+
+        <div class="content-footer">
+            ARM CPU 仿真器手册 &mdash; 基于 C++20、CMake 构建，致力于计算机架构研究。
+        </div>
+    </div>
+</main>
+
+<script src="../../js/main.js"></script>
+</body>
+</html>

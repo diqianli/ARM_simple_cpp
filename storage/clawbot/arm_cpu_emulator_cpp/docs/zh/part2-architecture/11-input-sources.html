@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>输入源接口 - ARM CPU 仿真器手册</title>
+    <link rel="stylesheet" href="../../css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>body { font-family: 'Inter', var(--font-sans); }</style>
+</head>
+<body>
+
+<header class="site-header">
+    <a class="header-logo" href="../index.html">
+        <span class="logo-icon">&#x1F9E0;</span>
+        ARM CPU 仿真器手册
+    </a>
+    <div class="header-search">
+        <span class="search-icon">&#x1F50D;</span>
+        <input type="text" placeholder="搜索文档... (Ctrl+K)" autocomplete="off">
+        <div class="search-results"></div>
+    </div>
+    <a class="lang-switch" href="../../part2-architecture/11-input-sources.html" style="color:var(--text-secondary);font-size:0.85rem;text-decoration:none;margin-right:8px;">English</a>
+    <button class="menu-toggle" aria-label="Toggle menu">&#9776;</button>
+</header>
+
+<nav class="sidebar" id="sidebar">
+    <div class="nav-section">
+        <div class="nav-section-title">第一部分 &mdash; 使用指南</div>
+        <a class="nav-item" href="../part1-usage/01-quick-start.html">1. 快速开始</a>
+        <a class="nav-item" href="../part1-usage/02-cli-reference.html">2. CLI 参数参考</a>
+        <a class="nav-item" href="../part1-usage/03-input-formats.html">3. 输入格式</a>
+        <a class="nav-item" href="../part1-usage/04-writing-test-programs.html">4. 编写测试程序</a>
+        <a class="nav-item" href="../part1-usage/05-running-simulations.html">5. 运行仿真</a>
+        <a class="nav-item" href="../part1-usage/06-output-analysis.html">6. 输出与结果分析</a>
+        <a class="nav-item" href="../part1-usage/07-visualization.html">7. 可视化工具</a>
+        <a class="nav-item" href="../part1-usage/08-configuration-presets.html">8. 配置预设</a>
+        <a class="nav-item" href="../part1-usage/09-benchmarks.html">9. 基准测试</a>
+        <a class="nav-item" href="../part1-usage/10-automation-scripts.html">10. 自动化脚本</a>
+        <a class="nav-item" href="../part1-usage/11-faq.html">11. 常见问题与排错</a>
+    </div>
+    <div class="nav-section">
+        <div class="nav-section-title">第二部分 &mdash; 架构文档</div>
+        <a class="nav-item" href="01-system-overview.html">1. 系统概览</a>
+        <a class="nav-item" href="02-cpu-pipeline.html">2. CPU 流水线</a>
+        <a class="nav-item" href="03-ooo-engine.html">3. 乱序执行引擎</a>
+        <a class="nav-item" href="04-instruction-decoder.html">4. 指令解码器</a>
+        <a class="nav-item" href="05-memory-hierarchy.html">5. 内存层次结构</a>
+        <a class="nav-item" href="06-elf-loader.html">6. ELF 加载器</a>
+        <a class="nav-item" href="07-statistics.html">7. 统计收集系统</a>
+        <a class="nav-item" href="08-visualization-system.html">8. 可视化系统</a>
+        <a class="nav-item" href="09-chi-coherence.html">9. CHI 一致性协议</a>
+        <a class="nav-item" href="10-type-system.html">10. 类型系统</a>
+        <a class="nav-item active" href="11-input-sources.html">11. 输入源接口</a>
+        <a class="nav-item" href="12-gem5-comparison.html">12. 与 GEM5 对比</a>
+    </div>
+</nav>
+
+<main class="main-content">
+    <div class="content-wrapper">
+
+        <div class="breadcrumb">
+            <a href="../index.html">首页</a>
+            <span class="sep">&rsaquo;</span>
+            <a href="../index.html">架构文档</a>
+            <span class="sep">&rsaquo;</span>
+            输入源接口
+        </div>
+
+        <div class="page-header">
+            <h1>输入源接口</h1>
+            <p class="page-desc">可插拔的输入源架构，支持多种 Trace 格式，通过工厂函数分派到合适的解析器。</p>
+        </div>
+
+        <p>仿真器使用可插拔的输入源架构。工厂函数 <code>create_source()</code> 根据指定的格式分派到相应的解析器，允许在核心仿真循环几乎不变的情况下添加新的输入类型。</p>
+
+        <h2>InstructionSource 接口</h2>
+
+        <p>定义在 <code>input/instruction_source.hpp</code>，此抽象基类定义了所有输入源的契约：</p>
+
+        <ul>
+            <li><strong><code>has_next()</code>：</strong>检查 Trace 中是否还有更多指令</li>
+            <li><strong><code>next()</code>：</strong>获取 Trace 中的下一条指令</li>
+            <li><strong><code>peek()</code>：</strong>查看下一条指令但不消费它</li>
+            <li><strong><code>reset()</code>：</strong>重置到 Trace 的开头</li>
+        </ul>
+
+        <h2>输入源实现</h2>
+
+        <h3>1. TraceInput（<code>input/instruction_source.cpp</code>）</h3>
+        <p>从人类可读的文本 Trace 文件中读取指令。逐行解析，格式为 <code>OPCODE [dest,] src1[, src2]</code>。</p>
+        <ul>
+            <li><strong>格式标志：</strong><code>-f text</code></li>
+            <li><strong>覆盖范围：</strong>约 40 个助记符（整数 ALU、Load/Store、分支、基础 FP）</li>
+            <li><strong>使用场景：</strong>快速调试和手动 Trace 创建</li>
+        </ul>
+
+        <h3>2. ElfTrace（<code>input/elf_trace.hpp</code>、<code>input/elf_trace.cpp</code>）</h3>
+        <p>通过运行时反汇编代码段来执行 ELF 二进制文件。这是获得完整 ISA 覆盖的推荐输入源。</p>
+        <ul>
+            <li><strong>格式标志：</strong><code>-f elf</code></li>
+            <li><strong>解码器：</strong>使用 Capstone 解码器进行指令解码（约 500 个 ARM64 助记符）</li>
+            <li><strong>分支预测：</strong>通过 <code>FunctionalSim</code> 实现功能性预仿真，用于准确的分支目标解析</li>
+            <li><strong>循环重放：</strong>支持长时间运行基准测试的循环重放</li>
+        </ul>
+
+        <h3>3. FunctionalSim（<code>input/functional_sim.hpp</code>、<code>input/functional_sim.cpp</code>）</h3>
+        <p>功能性地（不进行时序仿真）预执行 ELF 二进制文件，以确定实际的分支结果。这为 <code>ElfTrace</code> 源提供"完美分支预测"数据。</p>
+        <ul>
+            <li><strong>角色：</strong>在时序仿真运行之前记录实际的分支结果</li>
+            <li><strong>输出：</strong>生成具有正确分支目标的指令 Trace</li>
+            <li><strong>使用者：</strong><code>ElfTrace</code> 内部使用它进行分支预测</li>
+        </ul>
+
+        <h3>4. ChampSimTrace（<code>input/champsim_trace.cpp</code>）</h3>
+        <p>解析 ChampSim 学术 Trace 格式，这是计算机架构研究中常用的格式。</p>
+        <ul>
+            <li><strong>格式标志：</strong><code>-f champsim</code> 或 <code>-f champsim_xz</code></li>
+            <li><strong>压缩：</strong>支持原始和 XZ 压缩的 Trace（通过 liblzma）</li>
+            <li><strong>格式：</strong>每行 <code>0 addr PCS accesses</code></li>
+        </ul>
+
+        <h2>工厂函数</h2>
+
+        <p>工厂函数根据配置创建适当的输入源：</p>
+
+        <pre><code class="language-cpp">std::unique_ptr&lt;InstructionSource&gt; create_source(
+    const TraceInputConfig&amp; config,
+    const CPUConfig&amp; cpu_config);</code></pre>
+
+        <p>它根据 <code>config.format</code>（一个 <code>TraceFormat</code> 枚举）进行分派，为指定的输入类型选择正确的解析器和解码器组合。</p>
+
+        <h2>ELF 循环重放</h2>
+
+        <p>对于在紧密循环中运行的基准测试，仿真器可以多次重放 ELF，以防止 Trace 过早结束。这通过最大指令数（<code>-n</code>）或最大周期数（<code>-c</code>）限制来配置，它们控制仿真在 Trace 长度无关的情况下何时终止。</p>
+
+        <h2>输入格式 &rarr; 源映射</h2>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>格式</th>
+                    <th>源类</th>
+                    <th>解码器</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>ELF</strong></td>
+                    <td><code>ElfTrace</code></td>
+                    <td><code>CapstoneDecoder</code></td>
+                </tr>
+                <tr>
+                    <td><strong>Text</strong></td>
+                    <td><code>TraceInput</code></td>
+                    <td><code>TextTraceParser</code></td>
+                </tr>
+                <tr>
+                    <td><strong>ChampSim</strong></td>
+                    <td><code>ChampSimTrace</code></td>
+                    <td>（Trace 格式）</td>
+                </tr>
+                <tr>
+                    <td><strong>ChampSimXZ</strong></td>
+                    <td><code>ChampSimTrace</code> + liblzma</td>
+                    <td>（Trace 格式）</td>
+                </tr>
+                <tr>
+                    <td><strong>JSON</strong></td>
+                    <td><code>JsonTrace</code></td>
+                    <td>（JSON 格式）</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <div class="page-nav">
+            <a class="nav-prev" href="10-type-system.html">
+                <span class="nav-label">上一页</span>
+                <span class="nav-title">&larr; 类型系统</span>
+            </a>
+            <a class="nav-next" href="12-gem5-comparison.html">
+                <span class="nav-label">下一页</span>
+                <span class="nav-title">与 GEM5 对比 &rarr;</span>
+            </a>
+        </div>
+
+        <div class="content-footer">
+            ARM CPU 仿真器手册 &mdash; 基于 C++20、CMake 构建，致力于计算机架构研究。
+        </div>
+    </div>
+</main>
+
+<script src="../../js/main.js"></script>
+</body>
+</html>

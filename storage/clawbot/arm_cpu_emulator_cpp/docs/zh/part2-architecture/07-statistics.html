@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>统计收集系统 - ARM CPU 仿真器手册</title>
+    <link rel="stylesheet" href="../../css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>body { font-family: 'Inter', var(--font-sans); }</style>
+</head>
+<body>
+
+<header class="site-header">
+    <a class="header-logo" href="../index.html">
+        <span class="logo-icon">&#x1F9E0;</span>
+        ARM CPU 仿真器手册
+    </a>
+    <div class="header-search">
+        <span class="search-icon">&#x1F50D;</span>
+        <input type="text" placeholder="搜索文档... (Ctrl+K)" autocomplete="off">
+        <div class="search-results"></div>
+    </div>
+    <a class="lang-switch" href="../../part2-architecture/07-statistics.html" style="color:var(--text-secondary);font-size:0.85rem;text-decoration:none;margin-right:8px;">English</a>
+    <button class="menu-toggle" aria-label="Toggle menu">&#9776;</button>
+</header>
+
+<nav class="sidebar" id="sidebar">
+    <div class="nav-section">
+        <div class="nav-section-title">第一部分 &mdash; 使用指南</div>
+        <a class="nav-item" href="../part1-usage/01-quick-start.html">1. 快速开始</a>
+        <a class="nav-item" href="../part1-usage/02-cli-reference.html">2. CLI 参数参考</a>
+        <a class="nav-item" href="../part1-usage/03-input-formats.html">3. 输入格式</a>
+        <a class="nav-item" href="../part1-usage/04-writing-test-programs.html">4. 编写测试程序</a>
+        <a class="nav-item" href="../part1-usage/05-running-simulations.html">5. 运行仿真</a>
+        <a class="nav-item" href="../part1-usage/06-output-analysis.html">6. 输出与结果分析</a>
+        <a class="nav-item" href="../part1-usage/07-visualization.html">7. 可视化工具</a>
+        <a class="nav-item" href="../part1-usage/08-configuration-presets.html">8. 配置预设</a>
+        <a class="nav-item" href="../part1-usage/09-benchmarks.html">9. 基准测试</a>
+        <a class="nav-item" href="../part1-usage/10-automation-scripts.html">10. 自动化脚本</a>
+        <a class="nav-item" href="../part1-usage/11-faq.html">11. 常见问题与排错</a>
+    </div>
+    <div class="nav-section">
+        <div class="nav-section-title">第二部分 &mdash; 架构文档</div>
+        <a class="nav-item" href="01-system-overview.html">1. 系统概览</a>
+        <a class="nav-item" href="02-cpu-pipeline.html">2. CPU 流水线</a>
+        <a class="nav-item" href="03-ooo-engine.html">3. 乱序执行引擎</a>
+        <a class="nav-item" href="04-instruction-decoder.html">4. 指令解码器</a>
+        <a class="nav-item" href="05-memory-hierarchy.html">5. 内存层次结构</a>
+        <a class="nav-item" href="06-elf-loader.html">6. ELF 加载器</a>
+        <a class="nav-item active" href="07-statistics.html">7. 统计收集系统</a>
+        <a class="nav-item" href="08-visualization-system.html">8. 可视化系统</a>
+        <a class="nav-item" href="09-chi-coherence.html">9. CHI 一致性协议</a>
+        <a class="nav-item" href="10-type-system.html">10. 类型系统</a>
+        <a class="nav-item" href="11-input-sources.html">11. 输入源接口</a>
+        <a class="nav-item" href="12-gem5-comparison.html">12. 与 GEM5 对比</a>
+    </div>
+</nav>
+
+<main class="main-content">
+    <div class="content-wrapper">
+
+        <div class="breadcrumb">
+            <a href="../index.html">首页</a>
+            <span class="sep">&rsaquo;</span>
+            <a href="../index.html">架构文档</a>
+            <span class="sep">&rsaquo;</span>
+            统计收集系统
+        </div>
+
+        <div class="page-header">
+            <h1>统计收集系统</h1>
+            <p class="page-desc">两大核心组件 &mdash; StatsCollector 负责原始事件追踪，PerformanceMetrics 负责派生分析 &mdash; 提供全面的仿真洞察。</p>
+        </div>
+
+        <h2>StatsCollector</h2>
+
+        <p>源文件：<code>stats/stats_collector.hpp</code></p>
+
+        <p><code>StatsCollector</code> 是仿真过程中的核心统计收集组件。它每个周期由 CPU 流水线更新，记录以下类别的事件：</p>
+
+        <ul>
+            <li><strong>每条指令的延迟</strong> &mdash; 每条指令从 Fetch 到 Commit 的周期数</li>
+            <li><strong>Cache 事件</strong> &mdash; 每个 Cache 级别（L1、L2、L3）的命中、未命中和驱逐次数</li>
+            <li><strong>内存操作计数</strong> &mdash; 执行的 Load 和 Store 总数</li>
+            <li><strong>分支预测结果</strong> &mdash; 正确和错误的预测次数</li>
+            <li><strong>Pipeline 停顿周期</strong> &mdash; 按类型（数据冒险、Cache 未命中、结构冒险等）分类的停顿周期明细</li>
+            <li><strong>功能单元使用情况</strong> &mdash; 每种执行单元类型的周期计数</li>
+        </ul>
+
+        <p>关键记录方法：</p>
+
+        <div class="cli-table">
+            <div class="cli-row">
+                <div class="cli-flag"><code>record_cache_access()</code></div>
+                <div class="cli-desc">记录 Cache 访问事件，包含命中/未命中结果、延迟和 Cache 级别。</div>
+            </div>
+            <div class="cli-row">
+                <div class="cli-flag"><code>record_branch()</code></div>
+                <div class="cli-desc">记录分支预测事件，包含预测结果与实际结果。</div>
+            </div>
+            <div class="cli-row">
+                <div class="cli-flag"><code>record_instruction()</code></div>
+                <div class="cli-desc">记录指令完成，包含每条指令的时序数据。</div>
+            </div>
+        </div>
+
+        <h2>PerformanceMetrics</h2>
+
+        <p>源文件：<code>stats/performance_metrics.hpp</code></p>
+
+        <p><code>PerformanceMetrics</code> 组件从 <code>StatsCollector</code> 收集的原始统计数据计算派生指标。<code>PerformanceStats</code> 结构体包含：</p>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>指标</th>
+                    <th>描述</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><code>total_instructions</code></td>
+                    <td>仿真的指令总数</td>
+                </tr>
+                <tr>
+                    <td><code>total_cycles</code></td>
+                    <td>仿真总周期数</td>
+                </tr>
+                <tr>
+                    <td><code>ipc</code></td>
+                    <td>每周期指令数（total_instructions / total_cycles）</td>
+                </tr>
+                <tr>
+                    <td><code>cpi</code></td>
+                    <td>每指令周期数（total_cycles / total_instructions）</td>
+                </tr>
+                <tr>
+                    <td>Cache 统计</td>
+                    <td>每个级别：命中次数、未命中次数、命中率、MPKI（每千条指令的未命中次数）</td>
+                </tr>
+                <tr>
+                    <td>分支预测</td>
+                    <td>正确预测次数、总预测次数、准确率百分比</td>
+                </tr>
+                <tr>
+                    <td>功能单元利用率</td>
+                    <td>每个单元处于忙碌状态的周期占比</td>
+                </tr>
+                <tr>
+                    <td>Pipeline 停顿分布</td>
+                    <td>按停顿类型分类的停顿周期明细</td>
+                </tr>
+                <tr>
+                    <td>指令混合</td>
+                    <td>按 <code>OpcodeType</code> 类别分类的明细</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <p>指标组件还维护两个时间序列用于趋势分析：</p>
+
+        <ul>
+            <li><strong>IPC 时间序列</strong> &mdash; 每 1000 个周期采样一次 IPC，用于 IPC 趋势可视化</li>
+            <li><strong>实际运行时间序列</strong> &mdash; 跟踪实时仿真速度（每实际秒执行的指令数）</li>
+        </ul>
+
+        <h2>指令混合类别</h2>
+
+        <p>统计数据按 <code>OpcodeType</code> 分为以下类别：</p>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>类别</th>
+                    <th>操作码</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>整数 ALU</strong></td>
+                    <td>Add, Sub, And, Or, Xor, Shift, Move 等</td>
+                </tr>
+                <tr>
+                    <td><strong>整数乘法</strong></td>
+                    <td>Mul, Mneg, MADD, MSUB 等</td>
+                </tr>
+                <tr>
+                    <td><strong>Load</strong></td>
+                    <td>Ldr, Ldp, Ldrb, Ldrh, Ldrsb, Ldrsw, Ldur, Prfm 等</td>
+                </tr>
+                <tr>
+                    <td><strong>Store</strong></td>
+                    <td>Str, Stp, Strb, Strh, Stur 等</td>
+                </tr>
+                <tr>
+                    <td><strong>分支</strong></td>
+                    <td>B, Bl, Cbz, Cbnz, B.cond, Br, Blr, Ret 等</td>
+                </tr>
+                <tr>
+                    <td><strong>FP</strong></td>
+                    <td>Fadd, Fsub, Fmul, Fdiv, Fcmp, Fmov, Fcvt 等</td>
+                </tr>
+                <tr>
+                    <td><strong>SIMD</strong></td>
+                    <td>SimdAdd, SimdMul, SimdDup, SimdIns, SimdZip 等</td>
+                </tr>
+                <tr>
+                    <td><strong>系统</strong></td>
+                    <td>Barrier, Nop, Mrs, Msr, Sys 等</td>
+                </tr>
+                <tr>
+                    <td><strong>加密</strong></td>
+                    <td>Aes*, Sha* 等</td>
+                </tr>
+                <tr>
+                    <td><strong>SVE</strong></td>
+                    <td>SveAdd, SveMul, SveCmp, SveWhile 等</td>
+                </tr>
+                <tr>
+                    <td><strong>SME</strong></td>
+                    <td>Sme* 操作（Streaming SVE 模式）</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <div class="callout callout-info">
+            <div class="callout-title">指令混合与性能关联</div>
+            <p>指令混合对于理解仿真瓶颈非常有价值。例如，Load 指令占比高且 L1 命中率低，说明是内存受限的工作负载。分支比例高且预测准确率低，则表明是控制流受限的行为。</p>
+        </div>
+
+        <h2>Trace 输出</h2>
+
+        <p>可以通过 <code>--save-trace</code> 标志启用详细的逐指令执行 Trace。Trace 记录：</p>
+
+        <ul>
+            <li><strong>周期时间戳</strong>，对应每个 Pipeline 阶段（Fetch、Decode、Rename、Dispatch、Issue、Execute、Writeback、Commit）</li>
+            <li><strong>寄存器值</strong>，每条指令读取和写入的寄存器值</li>
+            <li><strong>内存地址</strong>，Load/Store 指令访问的内存地址</li>
+            <li><strong>分支预测与结果</strong>，条件分支的预测和实际跳转结果</li>
+        </ul>
+
+        <div class="cli-table">
+            <div class="cli-row">
+                <div class="cli-flag"><code>--save-trace</code></div>
+                <div class="cli-desc">在输出 JSON 文件中启用详细的逐指令执行 Trace 记录。</div>
+            </div>
+            <div class="cli-row">
+                <div class="cli-flag"><code>--dump-range &lt;start&gt;:&lt;end&gt;</code></div>
+                <div class="cli-desc">仅导出指定范围内（含边界）指令的 Pipeline Trace。示例：<code>--dump-range 100:200</code>。</div>
+            </div>
+        </div>
+
+        <div class="callout callout-warning">
+            <div class="callout-title">Trace 文件大小</div>
+            <p>启用 <code>--save-trace</code> 可能产生较大的输出文件，尤其是长时间仿真时。使用 <code>--dump-range</code> 将 Trace 输出限制在感兴趣的指令窗口内，或配合 <code>-n</code> 限制总指令数。</p>
+        </div>
+
+        <div class="page-nav">
+            <a href="06-elf-loader.html">
+                <span class="nav-label">上一页</span>
+                <span class="nav-title">&larr; ELF 加载器</span>
+            </a>
+            <a class="nav-next" href="08-visualization-system.html">
+                <span class="nav-label">下一页</span>
+                <span class="nav-title">可视化系统 &rarr;</span>
+            </a>
+        </div>
+
+        <div class="content-footer">
+            ARM CPU 仿真器手册 &mdash; 基于 C++20、CMake 构建，致力于计算机架构研究。
+        </div>
+    </div>
+</main>
+
+<script src="../../js/main.js"></script>
+</body>
+</html>

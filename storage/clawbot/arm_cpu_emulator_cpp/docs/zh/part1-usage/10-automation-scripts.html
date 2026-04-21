@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>自动化脚本 - ARM CPU 仿真器手册</title>
+    <link rel="stylesheet" href="../../css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>body { font-family: 'Inter', var(--font-sans); }</style>
+</head>
+<body>
+
+<header class="site-header">
+    <a class="header-logo" href="../index.html">
+        <span class="logo-icon">&#x1F9E0;</span>
+        ARM CPU 仿真器手册
+    </a>
+    <div class="header-search">
+        <span class="search-icon">&#x1F50D;</span>
+        <input type="text" placeholder="搜索文档... (Ctrl+K)" autocomplete="off">
+        <div class="search-results"></div>
+    </div>
+    <a class="lang-switch" href="../../part1-usage/10-automation-scripts.html" style="color:var(--text-secondary);font-size:0.85rem;text-decoration:none;margin-right:8px;">English</a>
+    <button class="menu-toggle" aria-label="Toggle menu">&#9776;</button>
+</header>
+
+<nav class="sidebar" id="sidebar">
+    <div class="nav-section">
+        <div class="nav-section-title">第一部分 &mdash; 使用指南</div>
+        <a class="nav-item" href="01-quick-start.html">1. 快速开始</a>
+        <a class="nav-item" href="02-cli-reference.html">2. CLI 参数参考</a>
+        <a class="nav-item" href="03-input-formats.html">3. 输入格式</a>
+        <a class="nav-item" href="04-writing-test-programs.html">4. 编写测试程序</a>
+        <a class="nav-item" href="05-running-simulations.html">5. 运行仿真</a>
+        <a class="nav-item" href="06-output-analysis.html">6. 输出与结果分析</a>
+        <a class="nav-item" href="07-visualization.html">7. 可视化工具</a>
+        <a class="nav-item" href="08-configuration-presets.html">8. 配置预设</a>
+        <a class="nav-item" href="09-benchmarks.html">9. 基准测试</a>
+        <a class="nav-item active" href="10-automation-scripts.html">10. 自动化脚本</a>
+        <a class="nav-item" href="11-faq.html">11. 常见问题与排错</a>
+    </div>
+    <div class="nav-section">
+        <div class="nav-section-title">第二部分 &mdash; 架构文档</div>
+        <a class="nav-item" href="../part2-architecture/01-system-overview.html">1. 系统概览</a>
+        <a class="nav-item" href="../part2-architecture/02-cpu-pipeline.html">2. CPU 流水线</a>
+        <a class="nav-item" href="../part2-architecture/03-ooo-engine.html">3. 乱序执行引擎</a>
+        <a class="nav-item" href="../part2-architecture/04-instruction-decoder.html">4. 指令解码器</a>
+        <a class="nav-item" href="../part2-architecture/05-memory-hierarchy.html">5. 内存层次结构</a>
+        <a class="nav-item" href="../part2-architecture/06-elf-loader.html">6. ELF 加载器</a>
+        <a class="nav-item" href="../part2-architecture/07-statistics.html">7. 统计收集系统</a>
+        <a class="nav-item" href="../part2-architecture/08-visualization-system.html">8. 可视化系统</a>
+        <a class="nav-item" href="../part2-architecture/09-chi-coherence.html">9. CHI 一致性协议</a>
+        <a class="nav-item" href="../part2-architecture/10-type-system.html">10. 类型系统</a>
+        <a class="nav-item" href="../part2-architecture/11-input-sources.html">11. 输入源接口</a>
+        <a class="nav-item" href="../part2-architecture/12-gem5-comparison.html">12. 与 GEM5 对比</a>
+    </div>
+</nav>
+
+<main class="main-content">
+    <div class="content-wrapper">
+
+        <div class="breadcrumb">
+            <a href="../index.html">首页</a>
+            <span class="sep">&rsaquo;</span>
+            <a href="../index.html">使用指南</a>
+            <span class="sep">&rsaquo;</span>
+            自动化脚本
+        </div>
+
+        <div class="page-header">
+            <h1>自动化脚本</h1>
+            <p class="page-desc">使用项目的自动化脚本套件进行构建、编译、测试和对比，专为开发和 CI 工作流设计。</p>
+        </div>
+
+        <h2>1. <code>scripts/build.sh</code> &mdash; 构建脚本</h2>
+
+        <p>一键构建，处理 CMake 配置和编译。</p>
+
+        <ul>
+            <li><strong>用法：</strong><code>./scripts/build.sh [BuildType]</code></li>
+            <li><strong>BuildType：</strong>Debug、Release（默认）、RelWithDebInfo、MinSizeRel</li>
+            <li>通过 <code>nproc</code> / <code>sysctl -n hw.ncpu</code> 自动检测并行任务数</li>
+            <li><strong>输出二进制：</strong><code>build/arm_cpu_sim</code></li>
+        </ul>
+
+        <pre><code>./scripts/build.sh           # Release 构建
+./scripts/build.sh Debug     # 带调试符号的 Debug 构建</code></pre>
+
+        <h2>2. <code>scripts/compile_test_elf.sh</code> &mdash; 交叉编译测试程序</h2>
+
+        <p>将 <code>scripts/test_elf_source.c</code> 编译为 <code>tests/data/test_elf_aarch64</code>。</p>
+
+        <ul>
+            <li>自动检测交叉编译器：<code>aarch64-elf-gcc</code>、<code>aarch64-linux-gnu-gcc</code>、<code>aarch64-none-elf-gcc</code></li>
+            <li><strong>用法：</strong><code>./scripts/compile_test_elf.sh [compiler]</code></li>
+            <li>编译标志：<code>-static -O2 -nostdlib</code></li>
+            <li>使用 linux-gnu 编译器时还会编译动态链接变体</li>
+        </ul>
+
+        <pre><code>./scripts/compile_test_elf.sh                    # 自动检测
+./scripts/compile_test_elf.sh aarch64-elf-gcc    # 指定编译器</code></pre>
+
+        <h2>3. <code>scripts/test_all.sh</code> &mdash; 完整测试套件</h2>
+
+        <p>全面的 6 阶段测试流水线，用于验证整个仿真器。</p>
+
+        <ul>
+            <li><strong>用法：</strong><code>./scripts/test_all.sh [--fast]</code></li>
+            <li><code>--fast</code> 跳过压力测试</li>
+        </ul>
+
+        <h3>测试阶段</h3>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>阶段</th>
+                    <th>描述</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>1. BUILD</strong></td>
+                    <td>CMake 配置 + 构建 + 二进制检查</td>
+                </tr>
+                <tr>
+                    <td><strong>2. UNIT TESTS</strong></td>
+                    <td>ctest with output-on-failure</td>
+                </tr>
+                <tr>
+                    <td><strong>3. TEXT TRACE SIMULATION</strong></td>
+                    <td>基本 Trace、内存 Trace 和分支 Trace</td>
+                </tr>
+                <tr>
+                    <td><strong>4. ELF SIMULATION</strong></td>
+                    <td>静态和动态 ELF</td>
+                </tr>
+                <tr>
+                    <td><strong>5. MULTI-CONFIG</strong></td>
+                    <td>Minimal、High-performance、Tiny L1、Large Cache 配置</td>
+                </tr>
+                <tr>
+                    <td><strong>6. STRESS</strong></td>
+                    <td>长 Trace（1M 周期）、内存 Trace（1000 条指令，500K 周期）</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <p>每个阶段独立运行 &mdash; 一个阶段的失败不会阻止后续阶段。结果以 PASS/FAIL/SKIP 报告，末尾有汇总。</p>
+
+        <pre><code>./scripts/test_all.sh       # 完整测试套件
+./scripts/test_all.sh --fast # 跳过压力测试</code></pre>
+
+        <h2>4. <code>scripts/compare_gem5.py</code> &mdash; GEM5 对比</h2>
+
+        <p>将仿真器输出与 GEM5 O3 ARM 仿真器结果进行对比。</p>
+
+        <ul>
+            <li>使用 <code>--preset gem5_o3_arm_v7a</code> 以获得对齐的配置</li>
+            <li>对比维度：周期数、指令数、IPC、执行时间</li>
+        </ul>
+
+        <pre><code>python3 scripts/compare_gem5.py --ours output.json --gem5 gem5_output.json</code></pre>
+
+        <h2>CI 集成</h2>
+
+        <p>所有脚本都是自包含的，适用于 CI 流水线：</p>
+
+        <ul>
+            <li><code>test_all.sh</code> 成功时返回退出码 0，任何失败时返回 1</li>
+            <li>结合 <code>build.sh</code> 实现完整的 CI 工作流</li>
+        </ul>
+
+        <div class="callout callout-info">
+            <div class="callout-title">CI 工作流示例</div>
+            <pre><code># 在你的 CI 流水线中
+./scripts/build.sh Release
+./scripts/test_all.sh --fast
+echo "CI exit code: $?"</code></pre>
+        </div>
+
+        <div class="page-nav">
+            <a class="nav-prev" href="09-benchmarks.html">
+                <span class="nav-label">上一页</span>
+                <span class="nav-title">&larr; 基准测试</span>
+            </a>
+            <a class="nav-next" href="11-faq.html">
+                <span class="nav-label">下一页</span>
+                <span class="nav-title">常见问题与排错 &rarr;</span>
+            </a>
+        </div>
+
+        <div class="content-footer">
+            ARM CPU 仿真器手册 &mdash; 基于 C++20、CMake 构建，致力于计算机架构研究。
+        </div>
+    </div>
+</main>
+
+<script src="../../js/main.js"></script>
+</body>
+</html>

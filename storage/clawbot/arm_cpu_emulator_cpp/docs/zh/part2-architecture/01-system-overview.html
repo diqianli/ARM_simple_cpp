@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>系统概览 - ARM CPU 仿真器手册</title>
+    <link rel="stylesheet" href="../../css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>body { font-family: 'Inter', var(--font-sans); }</style>
+</head>
+<body>
+
+<header class="site-header">
+    <a class="header-logo" href="../index.html">
+        <span class="logo-icon">&#x1F9E0;</span>
+        ARM CPU 仿真器手册
+    </a>
+    <div class="header-search">
+        <span class="search-icon">&#x1F50D;</span>
+        <input type="text" placeholder="搜索文档... (Ctrl+K)" autocomplete="off">
+        <div class="search-results"></div>
+    </div>
+    <a class="lang-switch" href="../../part2-architecture/01-system-overview.html" style="color:var(--text-secondary);font-size:0.85rem;text-decoration:none;margin-right:8px;">English</a>
+    <button class="menu-toggle" aria-label="Toggle menu">&#9776;</button>
+</header>
+
+<nav class="sidebar" id="sidebar">
+    <div class="nav-section">
+        <div class="nav-section-title">第一部分 &mdash; 使用指南</div>
+        <a class="nav-item" href="../part1-usage/01-quick-start.html">1. 快速开始</a>
+        <a class="nav-item" href="../part1-usage/02-cli-reference.html">2. CLI 参数参考</a>
+        <a class="nav-item" href="../part1-usage/03-input-formats.html">3. 输入格式</a>
+        <a class="nav-item" href="../part1-usage/04-writing-test-programs.html">4. 编写测试程序</a>
+        <a class="nav-item" href="../part1-usage/05-running-simulations.html">5. 运行仿真</a>
+        <a class="nav-item" href="../part1-usage/06-output-analysis.html">6. 输出与结果分析</a>
+        <a class="nav-item" href="../part1-usage/07-visualization.html">7. 可视化工具</a>
+        <a class="nav-item" href="../part1-usage/08-configuration-presets.html">8. 配置预设</a>
+        <a class="nav-item" href="../part1-usage/09-benchmarks.html">9. 基准测试</a>
+        <a class="nav-item" href="../part1-usage/10-automation-scripts.html">10. 自动化脚本</a>
+        <a class="nav-item" href="../part1-usage/11-faq.html">11. 常见问题与排错</a>
+    </div>
+    <div class="nav-section">
+        <div class="nav-section-title">第二部分 &mdash; 架构文档</div>
+        <a class="nav-item active" href="01-system-overview.html">1. 系统概览</a>
+        <a class="nav-item" href="02-cpu-pipeline.html">2. CPU 流水线</a>
+        <a class="nav-item" href="03-ooo-engine.html">3. 乱序执行引擎</a>
+        <a class="nav-item" href="04-instruction-decoder.html">4. 指令解码器</a>
+        <a class="nav-item" href="05-memory-hierarchy.html">5. 内存层次结构</a>
+        <a class="nav-item" href="06-elf-loader.html">6. ELF 加载器</a>
+        <a class="nav-item" href="07-statistics.html">7. 统计收集系统</a>
+        <a class="nav-item" href="08-visualization-system.html">8. 可视化系统</a>
+        <a class="nav-item" href="09-chi-coherence.html">9. CHI 一致性协议</a>
+        <a class="nav-item" href="10-type-system.html">10. 类型系统</a>
+        <a class="nav-item" href="11-input-sources.html">11. 输入源接口</a>
+        <a class="nav-item" href="12-gem5-comparison.html">12. 与 GEM5 对比</a>
+    </div>
+</nav>
+
+<main class="main-content">
+    <div class="content-wrapper">
+
+        <div class="breadcrumb">
+            <a href="../index.html">首页</a>
+            <span class="sep">&rsaquo;</span>
+            <a href="../index.html">架构文档</a>
+            <span class="sep">&rsaquo;</span>
+            系统概览
+        </div>
+
+        <div class="page-header">
+            <h1>系统概览</h1>
+            <p class="page-desc">ARM CPU 仿真器的高层架构：面向 ARMv8 乱序处理器的 ESL 时序仿真器。</p>
+        </div>
+
+        <p>ARM CPU 仿真器是一个面向 ARMv8 乱序处理器的 ESL（Electronic System Level，电子系统级）时序仿真器。使用 C++20 编写，从原始 Rust 实现移植而来，可仿真指令流水线、Cache 层次结构和 CHI 互连协议。</p>
+
+        <h2>模块架构</h2>
+
+        <p>系统由多个互连的子系统组成：</p>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>子系统</th>
+                    <th>头文件</th>
+                    <th>职责</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>OoO Engine</strong></td>
+                    <td><code>ooo/ooo_engine.hpp</code></td>
+                    <td>指令窗口、依赖跟踪、重排序缓冲</td>
+                </tr>
+                <tr>
+                    <td><strong>Memory</strong></td>
+                    <td><code>memory/memory_subsystem.hpp</code></td>
+                    <td>L1/L2/L3 Cache、LSQ、DDR 控制器</td>
+                </tr>
+                <tr>
+                    <td><strong>CHI</strong></td>
+                    <td><code>chi/chi_manager.hpp</code></td>
+                    <td>AMBA CHI 协议（RN-F、HN-F、SN-F 节点）</td>
+                </tr>
+                <tr>
+                    <td><strong>Decoder</strong></td>
+                    <td><code>decoder/capstone_decoder.hpp</code></td>
+                    <td>Capstone v5 ARM64 反汇编（约 500 条助记符）</td>
+                </tr>
+                <tr>
+                    <td><strong>Input</strong></td>
+                    <td><code>input/instruction_source.hpp</code></td>
+                    <td>工厂模式，分派至格式特定的解析器</td>
+                </tr>
+                <tr>
+                    <td><strong>Stats</strong></td>
+                    <td><code>stats/stats_collector.hpp</code></td>
+                    <td>IPC、CPI、Cache 命中率、MPKI、指令混合比</td>
+                </tr>
+                <tr>
+                    <td><strong>Visualization</strong></td>
+                    <td><code>visualization/visualization_state.hpp</code></td>
+                    <td>Konata JSON 导出，供流水线时间线查看器使用</td>
+                </tr>
+                <tr>
+                    <td><strong>Analysis</strong></td>
+                    <td><code>analysis/topdown.hpp</code></td>
+                    <td>TopDown 微架构分析方法</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>两条仿真路径</h2>
+
+        <p>仿真器提供两种仿真模式，共享通用子系统：</p>
+
+        <ol>
+            <li>
+                <strong>CPUEmulator</strong>（<code>cpu.hpp</code>）：完整路径，包含 CHI 互连、Konata 可视化导出和 trace 输出。这是默认模式。
+            </li>
+            <li>
+                <strong>SimulationEngine</strong>（<code>simulation/simulation_engine.hpp</code>）：基于事件的路径，向可插拔的 sink 发射 <code>SimulationEvent</code>。无 Konata 导出。使用 <code>-e</code> 参数启用。
+            </li>
+        </ol>
+
+        <p>两条路径共享相同的 OoO Engine、Memory Subsystem 和 Stats Collector。</p>
+
+        <h2>数据流</h2>
+
+        <p>指令在系统中的流动路径如下：</p>
+
+        <pre><code>InstructionSource（trace/ELF 输入）
+  &rarr; Fetch/Dispatch
+  &rarr; OoOEngine（Rename, Issue, Execute）
+  &rarr; MemorySubsystem（LSQ, L1/L2/L3, DDR）
+  &rarr; Commit
+  &rarr; Stats/Visualization</code></pre>
+
+        <h2>源码目录结构</h2>
+
+        <pre><code>include/arm_cpu/
+&boxvr;&boxh; cpu.hpp              # CPUEmulator 主类
+&boxvr;&boxh; config.hpp           # CPUConfig 和预设
+&boxvr;&boxh; types.hpp            # 核心类型（Instruction, Reg, OpcodeType）
+&boxvr;&boxh; error.hpp            # Result&lt;T&gt; 错误处理
+&boxvr;&boxh; decoder/             # 指令解码器
+&boxvr;&boxh; ooo/                 # 乱序执行引擎
+&boxvr;&boxh; memory/              # Cache 层次结构和 DDR
+&boxvr;&boxh; chi/                 # CHI 一致性协议
+&boxvr;&boxh; input/               # 输入源接口
+&boxvr;&boxh; stats/               # 统计收集
+&boxvr;&boxh; visualization/       # 可视化和 Konata 导出
+&boxur;&boxh; analysis/            # TopDown 分析
+src/
+&boxvr;&boxh; cpu.cpp              # CPUEmulator 实现
+&boxvr;&boxh; main.cpp             # CLI 入口点
+&boxvr;&boxh; decoder/             # 解码器实现
+&boxvr;&boxh; ooo/                 # OoO Engine 实现
+&boxvr;&boxh; memory/              # 内存子系统实现
+&boxvr;&boxh; input/               # 输入源实现
+&boxvr;&boxh; stats/               # 统计实现
+&boxur;&boxh; visualization/       # 可视化实现</code></pre>
+
+        <h2>依赖项</h2>
+
+        <p>所有依赖均通过 CMake FetchContent 获取 &mdash; 无需手动安装：</p>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>库</th>
+                    <th>版本</th>
+                    <th>用途</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>nlohmann/json</strong></td>
+                    <td>v3.11.3</td>
+                    <td>JSON 处理</td>
+                </tr>
+                <tr>
+                    <td><strong>spdlog</strong></td>
+                    <td>v1.14.1</td>
+                    <td>日志记录</td>
+                </tr>
+                <tr>
+                    <td><strong>GoogleTest</strong></td>
+                    <td>v1.14.0</td>
+                    <td>单元测试</td>
+                </tr>
+                <tr>
+                    <td><strong>ankerl::unordered_dense</strong></td>
+                    <td>v4.4.0</td>
+                    <td>高性能哈希表</td>
+                </tr>
+                <tr>
+                    <td><strong>Capstone</strong></td>
+                    <td>v5</td>
+                    <td>ARM64 反汇编（可选，默认启用）</td>
+                </tr>
+                <tr>
+                    <td><strong>liblzma</strong></td>
+                    <td>系统</td>
+                    <td>ChampSim XZ 支持（可选）</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <div class="page-nav">
+            <a class="nav-prev" href="../part1-usage/11-faq.html">
+                <span class="nav-label">上一页</span>
+                <span class="nav-title">&larr; 常见问题与排错</span>
+            </a>
+            <a class="nav-next" href="02-cpu-pipeline.html">
+                <span class="nav-label">下一页</span>
+                <span class="nav-title">CPU 流水线 &rarr;</span>
+            </a>
+        </div>
+
+        <div class="content-footer">
+            ARM CPU 仿真器手册 &mdash; 基于 C++20、CMake 构建，致力于计算机架构研究。
+        </div>
+    </div>
+</main>
+
+<script src="../../js/main.js"></script>
+</body>
+</html>

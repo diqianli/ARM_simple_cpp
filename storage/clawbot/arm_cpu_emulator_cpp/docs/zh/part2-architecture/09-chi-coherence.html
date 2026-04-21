@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CHI 一致性协议 - ARM CPU 仿真器手册</title>
+    <link rel="stylesheet" href="../../css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>body { font-family: 'Inter', var(--font-sans); }</style>
+</head>
+<body>
+
+<header class="site-header">
+    <a class="header-logo" href="../index.html">
+        <span class="logo-icon">&#x1F9E0;</span>
+        ARM CPU 仿真器手册
+    </a>
+    <div class="header-search">
+        <span class="search-icon">&#x1F50D;</span>
+        <input type="text" placeholder="搜索文档... (Ctrl+K)" autocomplete="off">
+        <div class="search-results"></div>
+    </div>
+    <a class="lang-switch" href="../../part2-architecture/09-chi-coherence.html" style="color:var(--text-secondary);font-size:0.85rem;text-decoration:none;margin-right:8px;">English</a>
+    <button class="menu-toggle" aria-label="Toggle menu">&#9776;</button>
+</header>
+
+<nav class="sidebar" id="sidebar">
+    <div class="nav-section">
+        <div class="nav-section-title">第一部分 &mdash; 使用指南</div>
+        <a class="nav-item" href="../part1-usage/01-quick-start.html">1. 快速开始</a>
+        <a class="nav-item" href="../part1-usage/02-cli-reference.html">2. CLI 参数参考</a>
+        <a class="nav-item" href="../part1-usage/03-input-formats.html">3. 输入格式</a>
+        <a class="nav-item" href="../part1-usage/04-writing-test-programs.html">4. 编写测试程序</a>
+        <a class="nav-item" href="../part1-usage/05-running-simulations.html">5. 运行仿真</a>
+        <a class="nav-item" href="../part1-usage/06-output-analysis.html">6. 输出与结果分析</a>
+        <a class="nav-item" href="../part1-usage/07-visualization.html">7. 可视化工具</a>
+        <a class="nav-item" href="../part1-usage/08-configuration-presets.html">8. 配置预设</a>
+        <a class="nav-item" href="../part1-usage/09-benchmarks.html">9. 基准测试</a>
+        <a class="nav-item" href="../part1-usage/10-automation-scripts.html">10. 自动化脚本</a>
+        <a class="nav-item" href="../part1-usage/11-faq.html">11. 常见问题与排错</a>
+    </div>
+    <div class="nav-section">
+        <div class="nav-section-title">第二部分 &mdash; 架构文档</div>
+        <a class="nav-item" href="01-system-overview.html">1. 系统概览</a>
+        <a class="nav-item" href="02-cpu-pipeline.html">2. CPU 流水线</a>
+        <a class="nav-item" href="03-ooo-engine.html">3. 乱序执行引擎</a>
+        <a class="nav-item" href="04-instruction-decoder.html">4. 指令解码器</a>
+        <a class="nav-item" href="05-memory-hierarchy.html">5. 内存层次结构</a>
+        <a class="nav-item" href="06-elf-loader.html">6. ELF 加载器</a>
+        <a class="nav-item" href="07-statistics.html">7. 统计收集系统</a>
+        <a class="nav-item" href="08-visualization-system.html">8. 可视化系统</a>
+        <a class="nav-item active" href="09-chi-coherence.html">9. CHI 一致性协议</a>
+        <a class="nav-item" href="10-type-system.html">10. 类型系统</a>
+        <a class="nav-item" href="11-input-sources.html">11. 输入源接口</a>
+        <a class="nav-item" href="12-gem5-comparison.html">12. 与 GEM5 对比</a>
+    </div>
+</nav>
+
+<main class="main-content">
+    <div class="content-wrapper">
+
+        <div class="breadcrumb">
+            <a href="../index.html">首页</a>
+            <span class="sep">&rsaquo;</span>
+            <a href="../index.html">架构文档</a>
+            <span class="sep">&rsaquo;</span>
+            CHI 一致性协议
+        </div>
+
+        <div class="page-header">
+            <h1>CHI 一致性协议</h1>
+            <p class="page-desc">实现 AMBA CHI（Coherent Hub Interface）Cache 一致性协议，用于多核 Cache 一致性建模。</p>
+        </div>
+
+        <p>仿真器实现了 AMBA CHI（Coherent Hub Interface）Cache 一致性协议，提供了 ARM 多核系统中 Cache 一致性流量的真实模型。实现位于 <code>chi/chi_manager.hpp</code>。</p>
+
+        <div class="callout callout-info">
+            <div class="callout-title">默认禁用</div>
+            <p>CHI 一致性在单核仿真中<strong>默认禁用</strong>。通过命令行参数 <code>--enable-chi</code> 启用，或以编程方式设置 <code>CPUConfig::enable_chi = true</code>。</p>
+        </div>
+
+        <h2>CHI 节点类型</h2>
+
+        <p>CHI 协议建模了三种节点类型，每种节点代表一致性层次结构中的不同角色：</p>
+
+        <h3>1. RN-F（请求节点 - 完全一致）</h3>
+        <p>代表 CPU 核心的 Cache 控制器。它向互连发出读写请求，处理以下事务：</p>
+        <ul>
+            <li><strong>角色：</strong>向互连发出读/写请求</li>
+            <li><strong>节点 ID：</strong>通过 <code>chi_rnf_node_id</code> 配置（默认：0）</li>
+            <li><strong>请求类型：</strong>ReadShared、ReadClean、ReadNotSharedDirty、WriteLineUnique、MakeUnique</li>
+        </ul>
+
+        <h3>2. HN-F（Home 节点 - 完全一致）</h3>
+        <p>充当基于目录的一致性管理器，维护 Cache 行状态信息：</p>
+        <ul>
+            <li><strong>角色：</strong>基于目录的一致性管理器</li>
+            <li><strong>维护：</strong>Cache 行状态目录</li>
+            <li><strong>处理：</strong>Snoop 请求和数据响应</li>
+            <li><strong>节点 ID：</strong>通过 <code>chi_hnf_node_id</code> 配置（默认：1）</li>
+            <li><strong>目录大小：</strong>通过 <code>chi_directory_size</code> 配置（默认：4096 条目）</li>
+        </ul>
+
+        <h3>3. SN-F（Snoop 节点 - 完全一致）</h3>
+        <p>处理来自 HN-F 的 Snoop 请求，为 Cache 间数据传输提供数据：</p>
+        <ul>
+            <li><strong>角色：</strong>处理来自 HN-F 的 Snoop 请求</li>
+            <li><strong>提供：</strong>Cache 间数据传输的数据</li>
+            <li><strong>节点 ID：</strong>通过 <code>chi_snf_node_id</code> 配置（默认：2）</li>
+        </ul>
+
+        <h2>协议状态机</h2>
+
+        <p>Cache 行在请求处理过程中在 CHI 一致性状态之间转换：</p>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>状态</th>
+                    <th>描述</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>Invalid</strong></td>
+                    <td>Cache 行不存在</td>
+                </tr>
+                <tr>
+                    <td><strong>Shared (S)</strong></td>
+                    <td>干净副本；可能同时存在于多个 Cache 中</td>
+                </tr>
+                <tr>
+                    <td><strong>Unique (U)</strong></td>
+                    <td>系统中唯一的副本；干净</td>
+                </tr>
+                <tr>
+                    <td><strong>UniqueDirty (UD)</strong></td>
+                    <td>系统中唯一的副本；已修改（脏）</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>CHI 配置参数</h2>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>参数</th>
+                    <th>默认值</th>
+                    <th>描述</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><code>enable_chi</code></td>
+                    <td><code>false</code></td>
+                    <td>启用 CHI 协议</td>
+                </tr>
+                <tr>
+                    <td><code>chi_request_latency</code></td>
+                    <td>2 周期</td>
+                    <td>请求传输延迟</td>
+                </tr>
+                <tr>
+                    <td><code>chi_response_latency</code></td>
+                    <td>2 周期</td>
+                    <td>响应传输延迟</td>
+                </tr>
+                <tr>
+                    <td><code>chi_data_latency</code></td>
+                    <td>4 周期</td>
+                    <td>数据传输延迟</td>
+                </tr>
+                <tr>
+                    <td><code>chi_snoop_latency</code></td>
+                    <td>2 周期</td>
+                    <td>Snoop 往返延迟</td>
+                </tr>
+                <tr>
+                    <td><code>chi_max_pcrd_credits</code></td>
+                    <td>16</td>
+                    <td>最大 PCR（Protocol Credit）信用值</td>
+                </tr>
+                <tr>
+                    <td><code>chi_max_outstanding_dbid</code></td>
+                    <td>32</td>
+                    <td>最大未完成数据缓冲区 ID 数</td>
+                </tr>
+                <tr>
+                    <td><code>chi_max_retry_queue_size</code></td>
+                    <td>64</td>
+                    <td>最大重试队列条目数</td>
+                </tr>
+                <tr>
+                    <td><code>chi_directory_size</code></td>
+                    <td>4096</td>
+                    <td>目录条目数</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>CHI 请求类型</h2>
+
+        <p>协议支持以下请求类型，每种请求代表特定的一致性事务：</p>
+
+        <pre><code class="language-cpp">enum class ChiRequestType {
+    ReadShared,         // 共享读
+    ReadClean,          // 期望获取干净数据的读
+    ReadNotSharedDirty, // 带修改意图的读
+    WriteLineUnique,    // 写完整 Cache 行
+    MakeUnique,         // 升级为 Unique
+    CleanShared,        // 驱逐共享行
+    MakeInvalid,        // 驱逐 Unique/脏行
+};</code></pre>
+
+        <h2>QoS（服务质量）</h2>
+
+        <p>CHI 实现包含流量控制机制来管理互连带宽：</p>
+        <ul>
+            <li><strong>基于 PCR 信用的流量控制：</strong>使用 Protocol Credit（PCR）信用值限制在途请求数量，防止互连拥塞。</li>
+            <li><strong>未完成请求限制：</strong>限制并发数据缓冲区 ID 的最大数量（<code>chi_max_outstanding_dbid</code>），以约束资源使用。</li>
+            <li><strong>用于反压的重试队列：</strong>当信用耗尽或互连拥塞时，请求被放入重试队列（<code>chi_max_retry_queue_size</code>），在带宽可用时重新发出。</li>
+        </ul>
+
+        <div class="page-nav">
+            <a class="nav-prev" href="08-visualization-system.html">
+                <span class="nav-label">上一页</span>
+                <span class="nav-title">&larr; 可视化系统</span>
+            </a>
+            <a class="nav-next" href="10-type-system.html">
+                <span class="nav-label">下一页</span>
+                <span class="nav-title">类型系统 &rarr;</span>
+            </a>
+        </div>
+
+        <div class="content-footer">
+            ARM CPU 仿真器手册 &mdash; 基于 C++20、CMake 构建，致力于计算机架构研究。
+        </div>
+    </div>
+</main>
+
+<script src="../../js/main.js"></script>
+</body>
+</html>

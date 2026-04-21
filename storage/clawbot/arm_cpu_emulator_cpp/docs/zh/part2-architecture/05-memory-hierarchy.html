@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>内存层次结构 - ARM CPU 仿真器手册</title>
+    <link rel="stylesheet" href="../../css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>body { font-family: 'Inter', var(--font-sans); }</style>
+</head>
+<body>
+
+<header class="site-header">
+    <a class="header-logo" href="../index.html">
+        <span class="logo-icon">&#x1F9E0;</span>
+        ARM CPU 仿真器手册
+    </a>
+    <div class="header-search">
+        <span class="search-icon">&#x1F50D;</span>
+        <input type="text" placeholder="搜索文档... (Ctrl+K)" autocomplete="off">
+        <div class="search-results"></div>
+    </div>
+    <a class="lang-switch" href="../../part2-architecture/05-memory-hierarchy.html" style="color:var(--text-secondary);font-size:0.85rem;text-decoration:none;margin-right:8px;">English</a>
+    <button class="menu-toggle" aria-label="Toggle menu">&#9776;</button>
+</header>
+
+<nav class="sidebar" id="sidebar">
+    <div class="nav-section">
+        <div class="nav-section-title">第一部分 &mdash; 使用指南</div>
+        <a class="nav-item" href="../part1-usage/01-quick-start.html">1. 快速开始</a>
+        <a class="nav-item" href="../part1-usage/02-cli-reference.html">2. CLI 参数参考</a>
+        <a class="nav-item" href="../part1-usage/03-input-formats.html">3. 输入格式</a>
+        <a class="nav-item" href="../part1-usage/04-writing-test-programs.html">4. 编写测试程序</a>
+        <a class="nav-item" href="../part1-usage/05-running-simulations.html">5. 运行仿真</a>
+        <a class="nav-item" href="../part1-usage/06-output-analysis.html">6. 输出与结果分析</a>
+        <a class="nav-item" href="../part1-usage/07-visualization.html">7. 可视化工具</a>
+        <a class="nav-item" href="../part1-usage/08-configuration-presets.html">8. 配置预设</a>
+        <a class="nav-item" href="../part1-usage/09-benchmarks.html">9. 基准测试</a>
+        <a class="nav-item" href="../part1-usage/10-automation-scripts.html">10. 自动化脚本</a>
+        <a class="nav-item" href="../part1-usage/11-faq.html">11. 常见问题与排错</a>
+    </div>
+    <div class="nav-section">
+        <div class="nav-section-title">第二部分 &mdash; 架构文档</div>
+        <a class="nav-item" href="01-system-overview.html">1. 系统概览</a>
+        <a class="nav-item" href="02-cpu-pipeline.html">2. CPU 流水线</a>
+        <a class="nav-item" href="03-ooo-engine.html">3. 乱序执行引擎</a>
+        <a class="nav-item" href="04-instruction-decoder.html">4. 指令解码器</a>
+        <a class="nav-item active" href="05-memory-hierarchy.html">5. 内存层次结构</a>
+        <a class="nav-item" href="06-elf-loader.html">6. ELF 加载器</a>
+        <a class="nav-item" href="07-statistics.html">7. 统计收集系统</a>
+        <a class="nav-item" href="08-visualization-system.html">8. 可视化系统</a>
+        <a class="nav-item" href="09-chi-coherence.html">9. CHI 一致性协议</a>
+        <a class="nav-item" href="10-type-system.html">10. 类型系统</a>
+        <a class="nav-item" href="11-input-sources.html">11. 输入源接口</a>
+        <a class="nav-item" href="12-gem5-comparison.html">12. 与 GEM5 对比</a>
+    </div>
+</nav>
+
+<main class="main-content">
+    <div class="content-wrapper">
+
+        <div class="breadcrumb">
+            <a href="../index.html">首页</a>
+            <span class="sep">&rsaquo;</span>
+            <a href="../index.html">架构文档</a>
+            <span class="sep">&rsaquo;</span>
+            内存层次结构
+        </div>
+
+        <div class="page-header">
+            <h1>内存层次结构</h1>
+            <p class="page-desc">三级 Cache 层次结构配合 DDR 内存控制器，支持可配置的大小、关联度和延迟。</p>
+        </div>
+
+        <h2>Cache 组织结构</h2>
+
+        <p>仿真器建模了一个真实的三级 Cache 层次结构，由 DDR 内存控制器支撑。每一级均可通过命令行参数或预设独立配置。</p>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>级别</th>
+                    <th>默认大小</th>
+                    <th>关联度</th>
+                    <th>行大小</th>
+                    <th>命中延迟</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>L1</strong></td>
+                    <td>64 KB</td>
+                    <td>4 路</td>
+                    <td>64 B</td>
+                    <td>4 个周期</td>
+                </tr>
+                <tr>
+                    <td><strong>L2</strong></td>
+                    <td>512 KB</td>
+                    <td>8 路</td>
+                    <td>64 B</td>
+                    <td>12 个周期</td>
+                </tr>
+                <tr>
+                    <td><strong>L3</strong></td>
+                    <td>8 MB</td>
+                    <td>16 路</td>
+                    <td>64 B</td>
+                    <td>40 个周期</td>
+                </tr>
+                <tr>
+                    <td><strong>DDR</strong></td>
+                    <td>&mdash;</td>
+                    <td>&mdash;</td>
+                    <td>&mdash;</td>
+                    <td>150 个周期（基础）</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>Cache 实现</h2>
+
+        <p>源文件：<code>memory/cache.hpp</code>、<code>memory/cache.cpp</code></p>
+
+        <p>Cache 实现为组相联结构，具有以下特性：</p>
+
+        <ul>
+            <li><strong>LRU（Least Recently Used）替换策略</strong> &mdash; 驱逐每组中最近最少访问的 Cache 行</li>
+            <li><strong>组数</strong>计算方式：<code>cache_size / (associativity &times; line_size)</code></li>
+            <li><strong>CacheAccessInfo 结构体</strong>跟踪每次内存操作的访问类型（命中/未命中）、延迟和 Cache 级别</li>
+            <li><strong>写回策略</strong>用于 Store &mdash; 修改后的数据仅在驱逐时写回下一级</li>
+            <li><strong>Cache-to-Cache 传输</strong>在 L3 中建模，用于多核一致性场景</li>
+        </ul>
+
+        <h2>DDR 内存控制器</h2>
+
+        <p>DDR 内存控制器建模了真实的 DRAM 时序参数：</p>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>参数</th>
+                    <th>值</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>基础延迟</strong></td>
+                    <td>150 个周期</td>
+                </tr>
+                <tr>
+                    <td><strong>行缓冲命中奖励</strong></td>
+                    <td>-30 个周期（总计 120 个周期）</td>
+                </tr>
+                <tr>
+                    <td><strong>Bank 冲突惩罚</strong></td>
+                    <td>+20 个周期</td>
+                </tr>
+                <tr>
+                    <td><strong>Bank 数量</strong></td>
+                    <td>8 个 Bank，用于并行访问</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <p>控制器建模了真实的 DRAM 时序，包括<strong>激活</strong>、<strong>读/写</strong>和<strong>预充电</strong>操作。行缓冲命中（访问已打开的相同行）可获得延迟奖励，而 Bank 冲突（访问已打开 Bank 中的不同行）则会产生惩罚。</p>
+
+        <h2>Load/Store Queue (LSQ)</h2>
+
+        <p>源文件：<code>memory/lsq.hpp</code></p>
+
+        <p>Load/Store Queue 位于执行单元和 Cache 层次结构之间，管理内存排序和数据转发：</p>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>参数</th>
+                    <th>默认值</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>队列大小</strong></td>
+                    <td>64 个条目</td>
+                </tr>
+                <tr>
+                    <td><strong>Load 流水线数</strong></td>
+                    <td>2（可配置）</td>
+                </tr>
+                <tr>
+                    <td><strong>Store 流水线数</strong></td>
+                    <td>1（可配置）</td>
+                </tr>
+                <tr>
+                    <td><strong>未完成内存请求数</strong></td>
+                    <td>16（可配置）</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <p>每个 <code>LSQEntry</code> 结构跟踪以下信息：</p>
+
+        <ul>
+            <li>虚拟地址和物理地址</li>
+            <li>指令指针（PC）</li>
+            <li>数据大小（字节宽度）</li>
+            <li>完成状态</li>
+            <li>对前序 Store 的依赖（用于 Load-Store 转发）</li>
+        </ul>
+
+        <p>LSQ 具有独立的 Load 和 Store 流水线，允许 Load 和 Store 独立发射。当较新的 Load 依赖于队列中较旧的 Store 时，支持 Store-to-Load 转发。</p>
+
+        <h2>内存子系统集成</h2>
+
+        <p>源文件：<code>memory/memory_subsystem.hpp</code></p>
+
+        <p><code>MemorySubsystem</code> 类将所有内存组件组合为统一接口：</p>
+
+        <ul>
+            <li>将 L1、L2、L3 Cache 和 DDR 控制器组合为单一访问路径</li>
+            <li>启用 CHI 协议时处理 Cache 一致性</li>
+            <li>CPU 为每个内存操作调用 <code>record_cache_access()</code></li>
+            <li>返回包含完整计时信息的 <code>CacheAccessInfo</code> 结构体</li>
+        </ul>
+
+        <h2>Cache 访问流程</h2>
+
+        <p>内存访问从 L1 向下遍历至 DDR，每次未命中累加延迟：</p>
+
+        <pre><code>CPU Load/Store
+  &rarr; L1 Cache（命中 4 个周期）
+  &rarr; L2 Cache（命中 12 个周期，+4 L1 未命中）
+  &rarr; L3 Cache（命中 40 个周期，+12 L2 未命中）
+  &rarr; DDR（基础 150 个周期，+40 L3 未命中）</code></pre>
+
+        <p>在所有 Cache 级别全部未命中时，总访问延迟为 <strong>4 + 12 + 40 + 150 = 206 个周期</strong>。这一惩罚促使 OoO Engine 在内存操作未完成时执行独立指令以隐藏内存延迟。</p>
+
+        <div class="callout callout-info">
+            <div class="callout-title">非阻塞 Cache</div>
+            <p>Cache 未命中不会停顿流水线。LSQ 跟踪未完成的内存请求，并在数据返回时唤醒依赖指令。这对于在内存密集型工作负载上实现良好的 IPC 至关重要。</p>
+        </div>
+
+        <h2>配置参数</h2>
+
+        <div class="cli-table">
+            <div class="cli-row">
+                <div class="cli-flag"><code>--l1-size &lt;KB&gt;</code></div>
+                <div class="cli-desc">L1 数据 Cache 大小（千字节）。默认：<code>64</code>。常用值：32、64、128。</div>
+            </div>
+            <div class="cli-row">
+                <div class="cli-flag"><code>--l2-size &lt;KB&gt;</code></div>
+                <div class="cli-desc">L2 Cache 大小（千字节）。默认：<code>512</code>。常用值：256、512、1024。</div>
+            </div>
+            <div class="cli-row">
+                <div class="cli-flag"><code>--l3-size &lt;KB&gt;</code></div>
+                <div class="cli-desc">L3（末级）Cache 大小（千字节）。默认：<code>8192</code>（8 MB）。常用值：4096、8192、16384、32768。</div>
+            </div>
+        </div>
+
+        <div class="page-nav">
+            <a class="nav-prev" href="04-instruction-decoder.html">
+                <span class="nav-label">上一页</span>
+                <span class="nav-title">&larr; 指令解码器</span>
+            </a>
+            <a class="nav-next" href="06-elf-loader.html">
+                <span class="nav-label">下一页</span>
+                <span class="nav-title">ELF 加载器 &rarr;</span>
+            </a>
+        </div>
+
+        <div class="content-footer">
+            ARM CPU 仿真器手册 &mdash; 基于 C++20、CMake 构建，致力于计算机架构研究。
+        </div>
+    </div>
+</main>
+
+<script src="../../js/main.js"></script>
+</body>
+</html>

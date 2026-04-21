@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>可视化工具 - ARM CPU 仿真器手册</title>
+    <link rel="stylesheet" href="../../css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>body { font-family: 'Inter', var(--font-sans); }</style>
+</head>
+<body>
+
+<header class="site-header">
+    <a class="header-logo" href="../index.html">
+        <span class="logo-icon">&#x1F9E0;</span>
+        ARM CPU 仿真器手册
+    </a>
+    <div class="header-search">
+        <span class="search-icon">&#x1F50D;</span>
+        <input type="text" placeholder="搜索文档... (Ctrl+K)" autocomplete="off">
+        <div class="search-results"></div>
+    </div>
+    <a class="lang-switch" href="../../part1-usage/07-visualization.html" style="color:var(--text-secondary);font-size:0.85rem;text-decoration:none;margin-right:8px;">English</a>
+    <button class="menu-toggle" aria-label="Toggle menu">&#9776;</button>
+</header>
+
+<nav class="sidebar" id="sidebar">
+    <div class="nav-section">
+        <div class="nav-section-title">第一部分 &mdash; 使用指南</div>
+        <a class="nav-item" href="01-quick-start.html">1. 快速开始</a>
+        <a class="nav-item" href="02-cli-reference.html">2. CLI 参数参考</a>
+        <a class="nav-item" href="03-input-formats.html">3. 输入格式</a>
+        <a class="nav-item" href="04-writing-test-programs.html">4. 编写测试程序</a>
+        <a class="nav-item" href="05-running-simulations.html">5. 运行仿真</a>
+        <a class="nav-item" href="06-output-analysis.html">6. 输出与结果分析</a>
+        <a class="nav-item active" href="07-visualization.html">7. 可视化工具</a>
+        <a class="nav-item" href="08-configuration-presets.html">8. 配置预设</a>
+        <a class="nav-item" href="09-benchmarks.html">9. 基准测试</a>
+        <a class="nav-item" href="10-automation-scripts.html">10. 自动化脚本</a>
+        <a class="nav-item" href="11-faq.html">11. 常见问题与排错</a>
+    </div>
+    <div class="nav-section">
+        <div class="nav-section-title">第二部分 &mdash; 架构文档</div>
+        <a class="nav-item" href="../part2-architecture/01-system-overview.html">1. 系统概览</a>
+        <a class="nav-item" href="../part2-architecture/02-cpu-pipeline.html">2. CPU 流水线</a>
+        <a class="nav-item" href="../part2-architecture/03-ooo-engine.html">3. 乱序执行引擎</a>
+        <a class="nav-item" href="../part2-architecture/04-instruction-decoder.html">4. 指令解码器</a>
+        <a class="nav-item" href="../part2-architecture/05-memory-hierarchy.html">5. 内存层次结构</a>
+        <a class="nav-item" href="../part2-architecture/06-elf-loader.html">6. ELF 加载器</a>
+        <a class="nav-item" href="../part2-architecture/07-statistics.html">7. 统计收集系统</a>
+        <a class="nav-item" href="../part2-architecture/08-visualization-system.html">8. 可视化系统</a>
+        <a class="nav-item" href="../part2-architecture/09-chi-coherence.html">9. CHI 一致性协议</a>
+        <a class="nav-item" href="../part2-architecture/10-type-system.html">10. 类型系统</a>
+        <a class="nav-item" href="../part2-architecture/11-input-sources.html">11. 输入源接口</a>
+        <a class="nav-item" href="../part2-architecture/12-gem5-comparison.html">12. 与 GEM5 对比</a>
+    </div>
+</nav>
+
+<main class="main-content">
+    <div class="content-wrapper">
+
+        <div class="breadcrumb">
+            <a href="../index.html">首页</a>
+            <span class="sep">&rsaquo;</span>
+            <a href="../index.html">使用指南</a>
+            <span class="sep">&rsaquo;</span>
+            可视化工具
+        </div>
+
+        <div class="page-header">
+            <h1>可视化工具</h1>
+            <p class="page-desc">使用 Konata Pipeline 时间线查看器检查指令级时序、Pipeline 停顿和功能单元利用率。</p>
+        </div>
+
+        <h2>Konata Pipeline 查看器</h2>
+
+        <p>仿真器内置了 Konata 风格的 Pipeline 时间线查看器，可将每条指令的 Pipeline 阶段时序渲染为可交互、可缩放的图表。</p>
+
+        <h3>打开查看器</h3>
+
+        <p>有两种方式访问可视化界面：</p>
+
+        <h4>方式 A：直接打开 HTML 文件</h4>
+        <pre><code>file:///Users/mac/storage/clawbot/arm_cpu_emulator_cpp/tools/viz_server/index.html</code></pre>
+
+        <h4>方式 B：使用内置 Web 服务器</h4>
+        <pre><code>./build/arm_cpu_sim -f elf program.elf -p 3000</code></pre>
+        <p>然后在浏览器中打开 <code>http://localhost:3000</code>。可视化页面会自动加载，输出数据在同一地址提供服务。</p>
+
+        <h3>加载数据</h3>
+        <p>使用可视化界面中的文件选择器加载仿真器生成的 <code>output.json</code> 文件。</p>
+
+        <h2>时间线功能</h2>
+
+        <p>Pipeline 时间线支持以下交互操作：</p>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>操作</th>
+                    <th>方式</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>缩放</strong></td>
+                    <td>鼠标滚轮或缩放按钮</td>
+                </tr>
+                <tr>
+                    <td><strong>左右平移</strong></td>
+                    <td>在时间线上点击并拖动</td>
+                </tr>
+                <tr>
+                    <td><strong>搜索指令</strong></td>
+                    <td>按 PC 地址搜索以定位特定指令</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>按指令类型着色</h2>
+
+        <p>指令按类型着色，便于快速视觉识别：</p>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>颜色</th>
+                    <th>类别</th>
+                    <th>示例</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><span style="color:#3b82f6;font-weight:bold;">蓝色</span></td>
+                    <td>ALU 操作</td>
+                    <td>ADD, SUB, MUL, AND, ORR, EOR</td>
+                </tr>
+                <tr>
+                    <td><span style="color:#22c55e;font-weight:bold;">绿色</span></td>
+                    <td>Load 操作</td>
+                    <td>LDR, LDP, LDUR, LDRB, LDRH</td>
+                </tr>
+                <tr>
+                    <td><span style="color:#f97316;font-weight:bold;">橙色</span></td>
+                    <td>Store 操作</td>
+                    <td>STR, STP, STUR, STRB, STRH</td>
+                </tr>
+                <tr>
+                    <td><span style="color:#ef4444;font-weight:bold;">红色 / 粉色</span></td>
+                    <td>分支操作</td>
+                    <td>B, BL, CBZ, CBNZ, TBZ, RET, BR</td>
+                </tr>
+                <tr>
+                    <td><span style="color:#a855f7;font-weight:bold;">紫色</span></td>
+                    <td>浮点 / SIMD</td>
+                    <td>FADD, FSUB, FMUL, FADD (vector), SIMD 操作</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>Pipeline 阶段</h2>
+
+        <p>时间线显示每条指令在 Pipeline 各阶段的推进过程：</p>
+
+        <div class="pipeline-diagram">
+            <span class="pipeline-stage" style="background:#3b82f6;">IF (Fetch)</span>
+            <span class="pipeline-arrow">&rarr;</span>
+            <span class="pipeline-stage" style="background:#8b5cf6;">DE (Decode)</span>
+            <span class="pipeline-arrow">&rarr;</span>
+            <span class="pipeline-stage" style="background:#a855f7;">RN (Rename)</span>
+            <span class="pipeline-arrow">&rarr;</span>
+            <span class="pipeline-stage" style="background:#d946ef;">DI (Dispatch)</span>
+            <span class="pipeline-arrow">&rarr;</span>
+            <span class="pipeline-stage" style="background:#ec4899;">IS (Issue)</span>
+            <span class="pipeline-arrow">&rarr;</span>
+            <span class="pipeline-stage" style="background:#f43f5e;">EX (Execute)</span>
+            <span class="pipeline-arrow">&rarr;</span>
+            <span class="pipeline-stage" style="background:#f97316;">ME (Memory)</span>
+            <span class="pipeline-arrow">&rarr;</span>
+            <span class="pipeline-stage" style="background:#eab308;">WB (Writeback)</span>
+            <span class="pipeline-arrow">&rarr;</span>
+            <span class="pipeline-stage" style="background:#22c55e;">RR (Retire)</span>
+        </div>
+
+        <ul>
+            <li><strong>IF (Fetch)</strong> &mdash; 从指令流中取指</li>
+            <li><strong>DE (Decode)</strong> &mdash; 指令解码和分类</li>
+            <li><strong>RN (Rename)</strong> &mdash; 寄存器重命名以消除假依赖</li>
+            <li><strong>DI (Dispatch)</strong> &mdash; 分发到 Issue 队列</li>
+            <li><strong>IS (Issue)</strong> &mdash; 操作数就绪后 Issue 到功能单元</li>
+            <li><strong>EX (Execute)</strong> &mdash; 在分配的功能单元上执行</li>
+            <li><strong>ME (Memory)</strong> &mdash; 内存访问（仅 Load/Store 指令）</li>
+            <li><strong>WB (Writeback)</strong> &mdash; 结果写回寄存器文件</li>
+            <li><strong>RR (Retire)</strong> &mdash; 指令按程序顺序 Commit</li>
+        </ul>
+
+        <h2>性能指标面板</h2>
+
+        <p>可视化页面包含一个指标面板，显示以下内容：</p>
+        <ul>
+            <li><strong>IPC</strong> &mdash; 整体每周期指令数</li>
+            <li><strong>Cache 命中率</strong> &mdash; L1、L2、L3 Cache 命中率</li>
+            <li><strong>分支预测准确率</strong> &mdash; 正确预测分支的百分比</li>
+            <li><strong>功能单元利用率</strong> &mdash; 各类型功能单元繁忙时间的分布</li>
+        </ul>
+
+        <h2>替代方案：Performance Stats View</h2>
+
+        <p>如需表格形式的指标展示，<code>perf_stats_view.js</code> 组件提供了性能统计的结构化表格视图。当你需要直接比较数值而非查看时间线时，这非常有用。</p>
+
+        <h2>Kanata 日志导出</h2>
+
+        <p>仿真器可以 Kanata 格式导出执行 Trace，以便与其他支持 Kanata 日志格式的可视化工具配合使用。这适用于跨工具分析和与使用不同工具链的合作者共享结果。</p>
+
+        <div class="page-nav">
+            <a class="nav-prev" href="06-output-analysis.html">
+                <span class="nav-label">上一页</span>
+                <span class="nav-title">&larr; 输出与结果分析</span>
+            </a>
+            <a class="nav-next" href="08-configuration-presets.html">
+                <span class="nav-label">下一页</span>
+                <span class="nav-title">配置预设 &rarr;</span>
+            </a>
+        </div>
+
+        <div class="content-footer">
+            ARM CPU 仿真器手册 &mdash; 基于 C++20、CMake 构建，致力于计算机架构研究。
+        </div>
+    </div>
+</main>
+
+<script src="../../js/main.js"></script>
+</body>
+</html>

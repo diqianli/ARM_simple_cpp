@@ -878,3 +878,20 @@ code[class*="language-"] {
 .token.variable { color: #fb923c; }
 .token.deleted { color: #f87171; }
 .token.inserted { color: #4ade80; }
+
+/* Language Switch */
+.lang-switch {
+    color: var(--text-secondary);
+    font-size: 0.85rem;
+    text-decoration: none;
+    margin-right: 8px;
+    padding: 4px 10px;
+    border-radius: 4px;
+    border: 1px solid var(--border-color);
+    transition: all 0.2s ease;
+}
+.lang-switch:hover {
+    color: var(--accent-color);
+    border-color: var(--accent-color);
+    background: rgba(99, 102, 241, 0.08);
+}

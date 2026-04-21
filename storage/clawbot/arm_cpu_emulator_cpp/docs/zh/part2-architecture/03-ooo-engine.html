@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>乱序执行引擎 - ARM CPU 仿真器手册</title>
+    <link rel="stylesheet" href="../../css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>body { font-family: 'Inter', var(--font-sans); }</style>
+</head>
+<body>
+
+<header class="site-header">
+    <a class="header-logo" href="../index.html">
+        <span class="logo-icon">&#x1F9E0;</span>
+        ARM CPU 仿真器手册
+    </a>
+    <div class="header-search">
+        <span class="search-icon">&#x1F50D;</span>
+        <input type="text" placeholder="搜索文档... (Ctrl+K)" autocomplete="off">
+        <div class="search-results"></div>
+    </div>
+    <a class="lang-switch" href="../../part2-architecture/03-ooo-engine.html" style="color:var(--text-secondary);font-size:0.85rem;text-decoration:none;margin-right:8px;">English</a>
+    <button class="menu-toggle" aria-label="Toggle menu">&#9776;</button>
+</header>
+
+<nav class="sidebar" id="sidebar">
+    <div class="nav-section">
+        <div class="nav-section-title">第一部分 &mdash; 使用指南</div>
+        <a class="nav-item" href="../part1-usage/01-quick-start.html">1. 快速开始</a>
+        <a class="nav-item" href="../part1-usage/02-cli-reference.html">2. CLI 参数参考</a>
+        <a class="nav-item" href="../part1-usage/03-input-formats.html">3. 输入格式</a>
+        <a class="nav-item" href="../part1-usage/04-writing-test-programs.html">4. 编写测试程序</a>
+        <a class="nav-item" href="../part1-usage/05-running-simulations.html">5. 运行仿真</a>
+        <a class="nav-item" href="../part1-usage/06-output-analysis.html">6. 输出与结果分析</a>
+        <a class="nav-item" href="../part1-usage/07-visualization.html">7. 可视化工具</a>
+        <a class="nav-item" href="../part1-usage/08-configuration-presets.html">8. 配置预设</a>
+        <a class="nav-item" href="../part1-usage/09-benchmarks.html">9. 基准测试</a>
+        <a class="nav-item" href="../part1-usage/10-automation-scripts.html">10. 自动化脚本</a>
+        <a class="nav-item" href="../part1-usage/11-faq.html">11. 常见问题与排错</a>
+    </div>
+    <div class="nav-section">
+        <div class="nav-section-title">第二部分 &mdash; 架构文档</div>
+        <a class="nav-item" href="01-system-overview.html">1. 系统概览</a>
+        <a class="nav-item" href="02-cpu-pipeline.html">2. CPU 流水线</a>
+        <a class="nav-item active" href="03-ooo-engine.html">3. 乱序执行引擎</a>
+        <a class="nav-item" href="04-instruction-decoder.html">4. 指令解码器</a>
+        <a class="nav-item" href="05-memory-hierarchy.html">5. 内存层次结构</a>
+        <a class="nav-item" href="06-elf-loader.html">6. ELF 加载器</a>
+        <a class="nav-item" href="07-statistics.html">7. 统计收集系统</a>
+        <a class="nav-item" href="08-visualization-system.html">8. 可视化系统</a>
+        <a class="nav-item" href="09-chi-coherence.html">9. CHI 一致性协议</a>
+        <a class="nav-item" href="10-type-system.html">10. 类型系统</a>
+        <a class="nav-item" href="11-input-sources.html">11. 输入源接口</a>
+        <a class="nav-item" href="12-gem5-comparison.html">12. 与 GEM5 对比</a>
+    </div>
+</nav>
+
+<main class="main-content">
+    <div class="content-wrapper">
+
+        <div class="breadcrumb">
+            <a href="../index.html">首页</a>
+            <span class="sep">&rsaquo;</span>
+            <a href="../index.html">架构文档</a>
+            <span class="sep">&rsaquo;</span>
+            乱序执行引擎
+        </div>
+
+        <div class="page-header">
+            <h1>乱序执行引擎</h1>
+            <p class="page-desc">仿真器的核心组件，实现支持推测执行的乱序执行机制。</p>
+        </div>
+
+        <p>OoO Engine 是仿真器的核心，实现了支持推测执行的乱序执行机制。</p>
+
+        <h2>架构概览</h2>
+
+        <p>三个主要组件协同工作以实现乱序执行：</p>
+
+        <ol>
+            <li><strong>指令窗口</strong>（<code>ooo/window.hpp</code>）：Reorder Buffer（ROB），保存所有在飞指令</li>
+            <li><strong>依赖跟踪器</strong>（<code>ooo/dependency.hpp</code>）：跟踪寄存器和内存依赖</li>
+            <li><strong>调度器</strong>（<code>ooo/scheduler.hpp</code>）：选择就绪指令进行执行</li>
+        </ol>
+
+        <h2>指令窗口（ROB）</h2>
+
+        <p>指令窗口是 OoO Engine 的核心数据结构：</p>
+
+        <ul>
+            <li>大小通过 <code>window_size</code> 配置（默认：128）</li>
+            <li>每个条目是一个 <code>WindowEntry</code>，包含：
+                <ul>
+                    <li><code>Instruction</code> 数据</li>
+                    <li><code>InstrStatus</code> 状态机：Waiting &rarr; Ready &rarr; Executing &rarr; Completed &rarr; Committed</li>
+                    <li>物理寄存器映射</li>
+                    <li>依赖计数器（剩余寄存器 + 内存依赖数）</li>
+                </ul>
+            </li>
+            <li>指令从尾部进入，从头部提交（按序提交）</li>
+            <li>窗口满时 Fetch 停顿</li>
+        </ul>
+
+        <h2>依赖跟踪</h2>
+
+        <p>依赖在两个层面进行跟踪：</p>
+
+        <h3>寄存器依赖</h3>
+        <ul>
+            <li>通过寄存器重命名建立生产者-消费者关系</li>
+            <li>每条指令跟踪其产生的物理寄存器（目标）和消费的物理寄存器（源）</li>
+            <li>当生产者完成 Writeback 时解除依赖</li>
+        </ul>
+
+        <h3>内存依赖</h3>
+        <ul>
+            <li><strong>Load-after-Store (RAW)</strong>：Load 必须等待对相同地址的前序 Store</li>
+            <li><strong>Store-after-Store (WAW)</strong>：Store 必须按程序顺序完成</li>
+            <li>基于地址的消歧，用于 Load/Store 排序</li>
+        </ul>
+
+        <h2>调度器</h2>
+
+        <p>调度器每个周期检查窗口中的所有指令并执行以下步骤：</p>
+
+        <ol>
+            <li>检查窗口中所有处于 Waiting 状态的指令</li>
+            <li>唤醒依赖已满足的指令（转换到 Ready 状态）</li>
+            <li>每个周期最多选择 <code>issue_width</code> 条 Ready 指令</li>
+            <li>优先级：最旧的就绪指令优先（按程序顺序）</li>
+        </ol>
+
+        <h2>执行单元类型</h2>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>单元类型</th>
+                    <th>说明</th>
+                    <th>典型延迟</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><code>IntAlu</code></td>
+                    <td>整数算术/逻辑</td>
+                    <td>1 个周期</td>
+                </tr>
+                <tr>
+                    <td><code>IntMul</code></td>
+                    <td>整数乘法</td>
+                    <td>3 个周期</td>
+                </tr>
+                <tr>
+                    <td><code>Load</code></td>
+                    <td>内存加载</td>
+                    <td>4 个周期（L1 命中）</td>
+                </tr>
+                <tr>
+                    <td><code>Store</code></td>
+                    <td>内存存储</td>
+                    <td>1 个周期</td>
+                </tr>
+                <tr>
+                    <td><code>Branch</code></td>
+                    <td>条件/无条件分支</td>
+                    <td>1 个周期</td>
+                </tr>
+                <tr>
+                    <td><code>FpSimd</code></td>
+                    <td>浮点 / SIMD</td>
+                    <td>3&ndash;5 个周期</td>
+                </tr>
+                <tr>
+                    <td><code>System</code></td>
+                    <td>系统指令（屏障等）</td>
+                    <td>1&ndash;10 个周期</td>
+                </tr>
+                <tr>
+                    <td><code>Crypto</code></td>
+                    <td>加密指令</td>
+                    <td>可变</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>关键实现文件</h2>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>文件</th>
+                    <th>说明</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><code>include/arm_cpu/ooo/ooo_engine.hpp</code></td>
+                    <td>引擎主类</td>
+                </tr>
+                <tr>
+                    <td><code>include/arm_cpu/ooo/dependency.hpp</code></td>
+                    <td>依赖跟踪</td>
+                </tr>
+                <tr>
+                    <td><code>include/arm_cpu/ooo/scheduler.hpp</code></td>
+                    <td>指令调度</td>
+                </tr>
+                <tr>
+                    <td><code>include/arm_cpu/ooo/window.hpp</code></td>
+                    <td>指令窗口/ROB</td>
+                </tr>
+                <tr>
+                    <td><code>src/ooo/ooo_engine.cpp</code></td>
+                    <td>引擎实现</td>
+                </tr>
+                <tr>
+                    <td><code>src/ooo/dependency.cpp</code></td>
+                    <td>依赖解析</td>
+                </tr>
+                <tr>
+                    <td><code>src/ooo/scheduler.cpp</code></td>
+                    <td>调度器逻辑</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <div class="page-nav">
+            <a class="nav-prev" href="02-cpu-pipeline.html">
+                <span class="nav-label">上一页</span>
+                <span class="nav-title">&larr; CPU 流水线</span>
+            </a>
+            <a class="nav-next" href="04-instruction-decoder.html">
+                <span class="nav-label">下一页</span>
+                <span class="nav-title">指令解码器 &rarr;</span>
+            </a>
+        </div>
+
+        <div class="content-footer">
+            ARM CPU 仿真器手册 &mdash; 基于 C++20、CMake 构建，致力于计算机架构研究。
+        </div>
+    </div>
+</main>
+
+<script src="../../js/main.js"></script>
+</body>
+</html>

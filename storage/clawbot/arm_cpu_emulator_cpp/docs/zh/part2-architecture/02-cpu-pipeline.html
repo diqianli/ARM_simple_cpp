@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CPU 流水线 - ARM CPU 仿真器手册</title>
+    <link rel="stylesheet" href="../../css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>body { font-family: 'Inter', var(--font-sans); }</style>
+</head>
+<body>
+
+<header class="site-header">
+    <a class="header-logo" href="../index.html">
+        <span class="logo-icon">&#x1F9E0;</span>
+        ARM CPU 仿真器手册
+    </a>
+    <div class="header-search">
+        <span class="search-icon">&#x1F50D;</span>
+        <input type="text" placeholder="搜索文档... (Ctrl+K)" autocomplete="off">
+        <div class="search-results"></div>
+    </div>
+    <a class="lang-switch" href="../../part2-architecture/02-cpu-pipeline.html" style="color:var(--text-secondary);font-size:0.85rem;text-decoration:none;margin-right:8px;">English</a>
+    <button class="menu-toggle" aria-label="Toggle menu">&#9776;</button>
+</header>
+
+<nav class="sidebar" id="sidebar">
+    <div class="nav-section">
+        <div class="nav-section-title">第一部分 &mdash; 使用指南</div>
+        <a class="nav-item" href="../part1-usage/01-quick-start.html">1. 快速开始</a>
+        <a class="nav-item" href="../part1-usage/02-cli-reference.html">2. CLI 参数参考</a>
+        <a class="nav-item" href="../part1-usage/03-input-formats.html">3. 输入格式</a>
+        <a class="nav-item" href="../part1-usage/04-writing-test-programs.html">4. 编写测试程序</a>
+        <a class="nav-item" href="../part1-usage/05-running-simulations.html">5. 运行仿真</a>
+        <a class="nav-item" href="../part1-usage/06-output-analysis.html">6. 输出与结果分析</a>
+        <a class="nav-item" href="../part1-usage/07-visualization.html">7. 可视化工具</a>
+        <a class="nav-item" href="../part1-usage/08-configuration-presets.html">8. 配置预设</a>
+        <a class="nav-item" href="../part1-usage/09-benchmarks.html">9. 基准测试</a>
+        <a class="nav-item" href="../part1-usage/10-automation-scripts.html">10. 自动化脚本</a>
+        <a class="nav-item" href="../part1-usage/11-faq.html">11. 常见问题与排错</a>
+    </div>
+    <div class="nav-section">
+        <div class="nav-section-title">第二部分 &mdash; 架构文档</div>
+        <a class="nav-item" href="01-system-overview.html">1. 系统概览</a>
+        <a class="nav-item active" href="02-cpu-pipeline.html">2. CPU 流水线</a>
+        <a class="nav-item" href="03-ooo-engine.html">3. 乱序执行引擎</a>
+        <a class="nav-item" href="04-instruction-decoder.html">4. 指令解码器</a>
+        <a class="nav-item" href="05-memory-hierarchy.html">5. 内存层次结构</a>
+        <a class="nav-item" href="06-elf-loader.html">6. ELF 加载器</a>
+        <a class="nav-item" href="07-statistics.html">7. 统计收集系统</a>
+        <a class="nav-item" href="08-visualization-system.html">8. 可视化系统</a>
+        <a class="nav-item" href="09-chi-coherence.html">9. CHI 一致性协议</a>
+        <a class="nav-item" href="10-type-system.html">10. 类型系统</a>
+        <a class="nav-item" href="11-input-sources.html">11. 输入源接口</a>
+        <a class="nav-item" href="12-gem5-comparison.html">12. 与 GEM5 对比</a>
+    </div>
+</nav>
+
+<main class="main-content">
+    <div class="content-wrapper">
+
+        <div class="breadcrumb">
+            <a href="../index.html">首页</a>
+            <span class="sep">&rsaquo;</span>
+            <a href="../index.html">架构文档</a>
+            <span class="sep">&rsaquo;</span>
+            CPU 流水线
+        </div>
+
+        <div class="page-header">
+            <h1>CPU 流水线</h1>
+            <p class="page-desc">驱动仿真器中指令执行的 9 级乱序流水线。</p>
+        </div>
+
+        <p>仿真器建模了一个 9 级乱序流水线，从 Fetch 到 Commit 处理指令，中间阶段支持乱序执行。</p>
+
+        <h2>流水线阶段</h2>
+
+        <ol>
+            <li>
+                <strong>Fetch (IF)</strong>：从输入源（trace 或 ELF）读取指令。每个周期最多取 <code>fetch_width</code> 条指令。
+            </li>
+            <li>
+                <strong>Decode (DE)</strong>：将原始指令字节解码为内部 <code>Instruction</code> 结构。两条解码路径：
+                <ul>
+                    <li>Capstone 路径（ELF 输入）：通过 Capstone v5 支持约 500 条助记符</li>
+                    <li>文本 trace 路径：通过自定义解析器支持约 40 条助记符</li>
+                </ul>
+            </li>
+            <li>
+                <strong>Rename (RN)</strong>：寄存器重命名以消除假依赖。将架构寄存器（X0&ndash;X30、V0&ndash;V31）映射到物理寄存器。
+            </li>
+            <li>
+                <strong>Dispatch (DI)</strong>：将重命名后的指令分派到指令窗口（ROB）。跟踪指令间的依赖关系。
+            </li>
+            <li>
+                <strong>Issue (IS)</strong>：唤醒并从窗口中选择就绪指令。使用计分板进行依赖跟踪。每个周期最多发射 <code>issue_width</code> 条指令。
+            </li>
+            <li>
+                <strong>Execute (EX)</strong>：指令在功能单元上执行。不同单元具有不同的延迟：
+                <ul>
+                    <li>整数 ALU：1 个周期（ADD、SUB、AND、OR 等）</li>
+                    <li>整数乘法：3 个周期</li>
+                    <li>Load：4 个周期（L1 命中）</li>
+                    <li>Store：1 个周期（地址计算）</li>
+                    <li>分支：1 个周期</li>
+                    <li>FP/SIMD：3&ndash;5 个周期</li>
+                    <li>加密：延迟可变</li>
+                </ul>
+            </li>
+            <li>
+                <strong>Memory Complete (ME)</strong>：Load 数据从 Cache 层次结构返回。Cache 未命中时可能停顿。
+            </li>
+            <li>
+                <strong>Writeback (WB)</strong>：结果写回并广播到窗口中的依赖指令。
+            </li>
+            <li>
+                <strong>Commit (RR)</strong>：指令按程序顺序提交。每个周期最多 <code>commit_width</code> 条。更新架构状态。
+            </li>
+        </ol>
+
+        <h2>主循环实现</h2>
+
+        <p>流水线由 <code>src/cpu.cpp</code> 中的 <code>CPUEmulator::run()</code> 驱动。每个周期：</p>
+
+        <ol>
+            <li>提交已完成的指令（按序）</li>
+            <li>写回结果</li>
+            <li>执行就绪指令</li>
+            <li>从窗口发射新指令</li>
+            <li>Dispatch/Decode/Fetch 新指令</li>
+            <li>更新统计信息</li>
+        </ol>
+
+        <h2>流水线示意图</h2>
+
+        <div class="pipeline-diagram">
+            <span class="pipeline-stage" style="background:#3b82f6;">Fetch</span>
+            <span class="pipeline-arrow">&rarr;</span>
+            <span class="pipeline-stage" style="background:#8b5cf6;">Decode</span>
+            <span class="pipeline-arrow">&rarr;</span>
+            <span class="pipeline-stage" style="background:#a855f7;">Rename</span>
+            <span class="pipeline-arrow">&rarr;</span>
+            <span class="pipeline-stage" style="background:#d946ef;">Dispatch</span>
+            <span class="pipeline-arrow">&rarr;</span>
+            <span class="pipeline-stage" style="background:#ec4899;">Issue</span>
+            <span class="pipeline-arrow">&rarr;</span>
+            <span class="pipeline-stage" style="background:#f43f5e;">Execute</span>
+            <span class="pipeline-arrow">&rarr;</span>
+            <span class="pipeline-stage" style="background:#f97316;">Memory</span>
+            <span class="pipeline-arrow">&rarr;</span>
+            <span class="pipeline-stage" style="background:#eab308;">Writeback</span>
+            <span class="pipeline-arrow">&rarr;</span>
+            <span class="pipeline-stage" style="background:#22c55e;">Commit</span>
+        </div>
+
+        <h2>流水线跟踪</h2>
+
+        <p><code>PipelineTracker</code> 记录每条指令进入/离开各阶段的时间。数据导出为 Konata JSON 格式以供可视化。每条指令的计时信息包括：</p>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>字段</th>
+                    <th>说明</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr><td><code>fetch_cycle</code></td><td>指令进入 Fetch 阶段的周期</td></tr>
+                <tr><td><code>decode_cycle</code></td><td>指令进入 Decode 阶段的周期</td></tr>
+                <tr><td><code>rename_cycle</code></td><td>指令进入 Rename 阶段的周期</td></tr>
+                <tr><td><code>dispatch_cycle</code></td><td>指令进入 Dispatch 阶段的周期</td></tr>
+                <tr><td><code>issue_cycle</code></td><td>指令被发射执行的周期</td></tr>
+                <tr><td><code>execute_cycle</code></td><td>指令开始执行的周期</td></tr>
+                <tr><td><code>memory_cycle</code></td><td>内存操作完成的周期</td></tr>
+                <tr><td><code>writeback_cycle</code></td><td>结果写回的周期</td></tr>
+                <tr><td><code>commit_cycle</code></td><td>指令提交的周期</td></tr>
+            </tbody>
+        </table>
+
+        <div class="page-nav">
+            <a class="nav-prev" href="01-system-overview.html">
+                <span class="nav-label">上一页</span>
+                <span class="nav-title">&larr; 系统概览</span>
+            </a>
+            <a class="nav-next" href="03-ooo-engine.html">
+                <span class="nav-label">下一页</span>
+                <span class="nav-title">乱序执行引擎 &rarr;</span>
+            </a>
+        </div>
+
+        <div class="content-footer">
+            ARM CPU 仿真器手册 &mdash; 基于 C++20、CMake 构建，致力于计算机架构研究。
+        </div>
+    </div>
+</main>
+
+<script src="../../js/main.js"></script>
+</body>
+</html>

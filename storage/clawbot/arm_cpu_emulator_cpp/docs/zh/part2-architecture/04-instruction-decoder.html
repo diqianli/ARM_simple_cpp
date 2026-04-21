@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>指令解码器 - ARM CPU 仿真器手册</title>
+    <link rel="stylesheet" href="../../css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>body { font-family: 'Inter', var(--font-sans); }</style>
+</head>
+<body>
+
+<header class="site-header">
+    <a class="header-logo" href="../index.html">
+        <span class="logo-icon">&#x1F9E0;</span>
+        ARM CPU 仿真器手册
+    </a>
+    <div class="header-search">
+        <span class="search-icon">&#x1F50D;</span>
+        <input type="text" placeholder="搜索文档... (Ctrl+K)" autocomplete="off">
+        <div class="search-results"></div>
+    </div>
+    <a class="lang-switch" href="../../part2-architecture/04-instruction-decoder.html" style="color:var(--text-secondary);font-size:0.85rem;text-decoration:none;margin-right:8px;">English</a>
+    <button class="menu-toggle" aria-label="Toggle menu">&#9776;</button>
+</header>
+
+<nav class="sidebar" id="sidebar">
+    <div class="nav-section">
+        <div class="nav-section-title">第一部分 &mdash; 使用指南</div>
+        <a class="nav-item" href="../part1-usage/01-quick-start.html">1. 快速开始</a>
+        <a class="nav-item" href="../part1-usage/02-cli-reference.html">2. CLI 参数参考</a>
+        <a class="nav-item" href="../part1-usage/03-input-formats.html">3. 输入格式</a>
+        <a class="nav-item" href="../part1-usage/04-writing-test-programs.html">4. 编写测试程序</a>
+        <a class="nav-item" href="../part1-usage/05-running-simulations.html">5. 运行仿真</a>
+        <a class="nav-item" href="../part1-usage/06-output-analysis.html">6. 输出与结果分析</a>
+        <a class="nav-item" href="../part1-usage/07-visualization.html">7. 可视化工具</a>
+        <a class="nav-item" href="../part1-usage/08-configuration-presets.html">8. 配置预设</a>
+        <a class="nav-item" href="../part1-usage/09-benchmarks.html">9. 基准测试</a>
+        <a class="nav-item" href="../part1-usage/10-automation-scripts.html">10. 自动化脚本</a>
+        <a class="nav-item" href="../part1-usage/11-faq.html">11. 常见问题与排错</a>
+    </div>
+    <div class="nav-section">
+        <div class="nav-section-title">第二部分 &mdash; 架构文档</div>
+        <a class="nav-item" href="01-system-overview.html">1. 系统概览</a>
+        <a class="nav-item" href="02-cpu-pipeline.html">2. CPU 流水线</a>
+        <a class="nav-item" href="03-ooo-engine.html">3. 乱序执行引擎</a>
+        <a class="nav-item active" href="04-instruction-decoder.html">4. 指令解码器</a>
+        <a class="nav-item" href="05-memory-hierarchy.html">5. 内存层次结构</a>
+        <a class="nav-item" href="06-elf-loader.html">6. ELF 加载器</a>
+        <a class="nav-item" href="07-statistics.html">7. 统计收集系统</a>
+        <a class="nav-item" href="08-visualization-system.html">8. 可视化系统</a>
+        <a class="nav-item" href="09-chi-coherence.html">9. CHI 一致性协议</a>
+        <a class="nav-item" href="10-type-system.html">10. 类型系统</a>
+        <a class="nav-item" href="11-input-sources.html">11. 输入源接口</a>
+        <a class="nav-item" href="12-gem5-comparison.html">12. 与 GEM5 对比</a>
+    </div>
+</nav>
+
+<main class="main-content">
+    <div class="content-wrapper">
+
+        <div class="breadcrumb">
+            <a href="../index.html">首页</a>
+            <span class="sep">&rsaquo;</span>
+            <a href="../index.html">架构文档</a>
+            <span class="sep">&rsaquo;</span>
+            指令解码器
+        </div>
+
+        <div class="page-header">
+            <h1>指令解码器</h1>
+            <p class="page-desc">将 ARM64 指令编码转换为内部结构，供流水线执行使用。</p>
+        </div>
+
+        <p>解码器子系统将指令编码转换为内部 <code>Instruction</code> 结构。提供两条解码路径，根据输入格式自动选择。</p>
+
+        <h2>解码器选择</h2>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>输入格式</th>
+                    <th>解码器</th>
+                    <th>ISA 覆盖范围</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>ELF</td>
+                    <td>CapstoneDecoder</td>
+                    <td>约 500 条助记符</td>
+                </tr>
+                <tr>
+                    <td>Text</td>
+                    <td>TextTraceParser</td>
+                    <td>约 40 条助记符</td>
+                </tr>
+                <tr>
+                    <td>ChampSim</td>
+                    <td>ChampSimTrace</td>
+                    <td>ChampSim 格式</td>
+                </tr>
+                <tr>
+                    <td>JSON</td>
+                    <td>JsonTrace</td>
+                    <td>不适用</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>Capstone 解码器</h2>
+
+        <p>主解码器（<code>decoder/capstone_decoder.hpp</code>）封装 Capstone v5，提供完整的 ARM64 反汇编功能：</p>
+
+        <ul>
+            <li>封装 Capstone v5 反汇编引擎，支持 ARM64</li>
+            <li>覆盖 ARMv8.0 至 ARMv8.7-A</li>
+            <li>支持扩展：SVE、SME、Crypto（AES、SHA1、SHA2、SHA3）</li>
+            <li>通过 <code>MnemonicLookup</code> 表实现约 500 条助记符映射</li>
+            <li>检测条件分支以支持分支预测</li>
+        </ul>
+
+        <p><strong>关键流程：</strong></p>
+
+        <ol>
+            <li>Capstone 反汇编指令字节</li>
+            <li>助记符字符串映射到内部 <code>OpcodeType</code> 枚举</li>
+            <li>解析操作数（寄存器、立即数、内存地址）</li>
+            <li>使用 Builder 模式构建 <code>Instruction</code></li>
+        </ol>
+
+        <h2>自定义 AArch64 解码器</h2>
+
+        <p>轻量级后备解码器（<code>decoder/aarch64_decoder.hpp</code>），在 Capstone 不可用时使用：</p>
+
+        <ul>
+            <li>子解码器：arithmetic、logical、load_store、branch、simd_neon、fp、crypto、system</li>
+            <li>在 Capstone 不可用时作为后备方案</li>
+            <li>使用 Builder 模式的 <code>DecodedInstruction</code> 结构体</li>
+        </ul>
+
+        <h2>助记符映射示例</h2>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>汇编</th>
+                    <th>助记符</th>
+                    <th>OpcodeType</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr><td><code>ADD X0, X1, X2</code></td><td>ADD</td><td>Add</td></tr>
+                <tr><td><code>SUB X3, X4, #5</code></td><td>SUB</td><td>Sub</td></tr>
+                <tr><td><code>MUL X5, X6, X7</code></td><td>MUL</td><td>Mul</td></tr>
+                <tr><td><code>LDR X0, [X1]</code></td><td>LDR</td><td>Load</td></tr>
+                <tr><td><code>STR X2, [X3, #8]</code></td><td>STR</td><td>Store</td></tr>
+                <tr><td><code>B label</code></td><td>B</td><td>Branch</td></tr>
+                <tr><td><code>BL func</code></td><td>BL</td><td>BranchLink</td></tr>
+                <tr><td><code>CBZ X0, label</code></td><td>CBZ</td><td>CondBranch</td></tr>
+                <tr><td><code>FADD D0, D1, D2</code></td><td>FADD</td><td>FpAdd</td></tr>
+                <tr><td><code>ADD V0.4S, V1.4S, V2.4S</code></td><td>ADD</td><td>SimdAdd</td></tr>
+                <tr><td><code>DMB ISH</code></td><td>DMB</td><td>Barrier</td></tr>
+            </tbody>
+        </table>
+
+        <h2>指令 Builder 模式</h2>
+
+        <p>指令使用流畅的 Builder 模式构建：</p>
+
+        <pre><code>Instruction instr;
+instr.with_opcode(OpcodeType::Add)
+     .with_pc(pc)
+     .with_src_reg(Reg::X1)
+     .with_src_reg(Reg::X2)
+     .with_dst_reg(Reg::X0);</code></pre>
+
+        <h2>条件分支检测</h2>
+
+        <p>Capstone 解码器识别条件分支（B.cond、CBZ、CBNZ、TBZ、TBNZ）并设置分支预测元数据供流水线使用。此信息流入 OoO Engine，以支持对预测跳转路径的推测执行。</p>
+
+        <div class="page-nav">
+            <a class="nav-prev" href="03-ooo-engine.html">
+                <span class="nav-label">上一页</span>
+                <span class="nav-title">&larr; 乱序执行引擎</span>
+            </a>
+            <a class="nav-next" href="05-memory-hierarchy.html">
+                <span class="nav-label">下一页</span>
+                <span class="nav-title">内存层次结构 &rarr;</span>
+            </a>
+        </div>
+
+        <div class="content-footer">
+            ARM CPU 仿真器手册 &mdash; 基于 C++20、CMake 构建，致力于计算机架构研究。
+        </div>
+    </div>
+</main>
+
+<script src="../../js/main.js"></script>
+</body>
+</html>
